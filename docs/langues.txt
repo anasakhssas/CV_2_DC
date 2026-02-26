@@ -1,0 +1,274 @@
+Très bon point 👍 parce que les langues dans un CV sont souvent écrites n’importe comment 😄:
+
+Français: courant
+
+Anglais: B2
+
+Arabic: native
+
+English: professional working proficiency
+
+Espagnol: notions
+
+Donc ton système doit normaliser tout ça → Top 3 langues avec niveau /5 propre.
+
+⭐ 1) Pipeline professionnel recommandé
+PDF CV
+ ↓
+Extraction texte
+ ↓
+Trouver section langues
+ ↓
+Extraction langues candidates
+ ↓
+Normalisation niveau
+ ↓
+Score maîtrise
+ ↓
+Top 3 langues
+2) Trouver la section Langues
+
+Cherche titres:
+
+Français:
+
+Langues
+
+Compétences linguistiques.
+
+Anglais:
+
+Languages
+
+Language skills.
+
+Mais attention:
+
+Parfois les langues apparaissent dans:
+
+Profile:
+Fluent in English and French.
+
+Donc fallback:
+
+👉 recherche globale si section absente.
+
+3) Extraire langues candidates
+
+Tu veux:
+
+langue.
+
+niveau texte.
+
+Ex:
+
+English : Professional proficiency.
+French : Fluent.
+Arabic : Native.
+
+Ou:
+
+Anglais B2.
+Français courant.
+4) Normalisation (TRÈS important)
+
+Chaque CV utilise un langage différent.
+
+Tu dois mapper vers une échelle commune.
+
+Exemple mapping recommandé
+Native / bilingue
+
+Native.
+
+Mother tongue.
+
+Bilingue.
+
+→ 5/5.
+
+Fluent / Courant
+
+Fluent.
+
+Couramment.
+
+Professional proficiency.
+
+C1.
+
+→ 4/5.
+
+Intermédiaire
+
+Intermediate.
+
+B1.
+
+B2.
+
+→ 3/5.
+
+Basique
+
+Basic.
+
+notions.
+
+scolaire.
+
+→ 2/5.
+
+Débutant
+
+beginner.
+
+→ 1/5.
+
+5) Cas CEFR (super fréquent)
+
+Europe utilise:
+
+A1 A2 B1 B2 C1 C2.
+
+Mapping conseillé:
+
+CEFR	Niveau
+A1	1/5
+A2	2/5
+B1	3/5
+B2	3.5 ou 4
+C1	4
+C2	5
+6) Si aucun niveau écrit (très fréquent)
+
+Ex:
+
+Languages:
+Arabic
+French
+English
+
+Tu peux:
+
+Option SAFE (recommandé):
+
+→ niveau inconnu.
+
+ou:
+
+Option intelligente:
+
+Cherche ailleurs.
+
+Ex:
+
+Worked in English environment.
+
+bonus.
+
+7) Score langue intelligente (niveau ATS)
+
+Ajoute bonus:
+
+Expérience internationale:
+
++1.
+
+Certifications IELTS/TOEFL:
+
++2.
+
+Travail multinational:
+
++1.
+
+Ex:
+
+TOEFL 105.
+
+Anglais = 5/5.
+
+8) Top 3 langues maîtrisées
+
+Trie:
+
+par niveau décroissant.
+
+Puis garde:
+
+Top 3.
+
+Si moins:
+
+retourne moins.
+
+9) Cas difficiles ⚠️
+Langue implicite
+
+CV Maroc:
+
+CV en français.
+
+Tu peux supposer:
+
+Français ≥ 4/5.
+
+Mais attention:
+
+optionnel.
+
+Native multiple
+
+Ex:
+
+Arabic native.
+
+French native.
+
+Pas de problème.
+
+Langue utilisée dans expérience
+
+Ex:
+
+Customer support English speaking clients.
+
+bonus.
+
+10) Format sortie recommandé
+
+Ton moteur retourne:
+
+langue.
+
+niveau.
+
+confidence.
+
+preuves.
+
+Ex:
+
+English:
+
+niveau 4/5.
+
+preuves:
+
+"Professional working proficiency".
+
+confidence:
+
+0.92.
+
+⭐ Conseil senior ENSAM (très important)
+
+Toujours:
+
+ne jamais inventer.
+
+garder citation CV.
+
+Ton système devient crédible.

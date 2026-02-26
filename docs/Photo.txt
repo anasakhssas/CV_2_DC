@@ -1,0 +1,192 @@
+Parfait 👍 si le CV entre uniquement en PDF, tu peux construire une méthode très efficace et robuste. Voici une stratégie utilisée dans les ATS (Applicant Tracking Systems) modernes.
+
+1) D’abord comprendre les PDF (2 cas principaux)
+
+Un PDF peut être:
+
+✅ PDF numérique (Word → PDF)
+
+Texte sélectionnable.
+
+Images séparées intégrées dans le fichier.
+
+Photo facile à extraire.
+
+⚠️ PDF scané
+
+Toute la page = une seule image.
+
+Photo fusionnée avec le fond.
+
+👉 Tu dois détecter le type automatiquement.
+
+Indice simple:
+
+si le texte est extractible → PDF numérique.
+
+sinon → scan.
+
+2) Pipeline professionnel recommandé
+
+Imagine une chaîne intelligente:
+
+Upload PDF
+   ↓
+Detect type
+   ↓
+Try Image Extraction (fast)
+   ↓
+If failed → Page Image Conversion
+   ↓
+Face Detection
+   ↓
+Crop Best Photo
+3) Étape 1: Extraction directe (priorité N°1)
+
+PDF numérique contient souvent plusieurs images:
+
+photo candidat
+
+logo
+
+icônes réseaux sociaux.
+
+Tu extrais toutes les images.
+
+Puis filtre:
+
+critères utiles:
+
+taille minimum (ex >150x150 px)
+
+ratio portrait (ex carré ou vertical)
+
+position haute page (photo souvent en haut).
+
+C’est rapide et qualité maximale.
+
+4) Étape 2: Si extraction échoue (CV Canva ou scan)
+
+Tu fais:
+
+PDF → images pages.
+
+Chaque page devient une image.
+
+Ensuite:
+
+👉 détecter visage.
+
+Pourquoi?
+
+90% des photos CV = visage frontal.
+
+Puis:
+
+crop autour du visage.
+
+Résultat:
+photo candidate propre.
+
+5) Comment choisir LA bonne photo (important)
+
+Tu peux avoir plusieurs images.
+
+Fais un score:
+
+Exemple:
+
+contient visage → +60 points
+
+grande résolution → +20
+
+position haut page → +10
+
+ratio portrait → +10
+
+Score max = gagnant.
+
+6) Nettoyage avant envoi vers Odoo
+
+Avant stockage:
+
+resize standard (ex 512x512).
+
+centre sur visage.
+
+enlever marge inutile.
+
+Ton dossier compétences sera très propre.
+
+7) Cas spéciaux que tu vas rencontrer ⚠️
+CV sans photo
+
+Retourne:
+
+photo_found = false
+
+Jamais inventer.
+
+Photo ronde Canva
+
+Face detection permet crop rectangle correct.
+
+Photo très petite
+
+Ignore.
+
+Plusieurs pages
+
+Photo presque toujours page 1.
+
+Optimisation:
+
+analyse page 1 d’abord.
+
+Gain énorme performance.
+
+8) Architecture recommandée avec ton projet
+
+Ton moteur externe:
+
+POST /extract-photo
+
+Input:
+
+PDF
+
+Output:
+
+photo.jpg
+confidence_score
+bounding_box
+
+Puis Odoo:
+
+stocke dans attachment.
+
+affiche dans fiche candidat.
+
+9) Défis réels
+
+Tu rencontreras:
+
+PDF compressé.
+
+images invisibles.
+
+scans flous.
+
+Mais avec extraction + face detection tu couvres 99% des cas.
+
+⭐ Conseil très important (niveau senior)
+
+Ne fais jamais UNE seule méthode.
+
+Toujours:
+
+Extraction directe
+   ↓
+fallback vision AI
+
+Sinon ton système cassera sur beaucoup de CV

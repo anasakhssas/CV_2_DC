@@ -1,0 +1,113 @@
+Voici une idée simple et robuste pour calculer les années d’expérience à partir d’un CV, même quand les dates sont “bizarres” 🧮
+
+1) Extraire une liste d’expériences structurées
+
+Pour chaque expérience, essaie d’obtenir:
+
+start_date (mois + année si possible)
+
+end_date (mois + année, ou “présent/aujourd’hui”)
+
+type (stage / CDI / CDD / freelance / projet académique)
+
+is_part_time (si indiqué)
+
+confidence (si dates incertaines)
+
+Si tu utilises un LLM: demande-lui de sortir un JSON “expériences” avec ces champs.
+
+2) Normaliser les dates
+
+Règles pratiques:
+
+“Présent” → date du jour.
+
+Année seule (ex: “2022”) → par défaut Jan 2022 pour start, Dec 2022 pour end (ou mieux: “incertain”).
+
+Mois manquant → arrondi conservateur (ex: start au 1er du mois, end au dernier jour du mois).
+
+Si end < start → ignorer ou marquer “à vérifier”.
+
+3) Calculer sans double-compter (le point clé)
+
+Beaucoup de candidats ont:
+
+chevauchements (2 jobs en même temps)
+
+missions freelance parallèles
+
+alternance/part-time
+
+La meilleure approche: union des intervalles.
+
+Méthode “union d’intervalles”
+
+Convertis chaque expérience en intervalle [start, end].
+
+Trie par date de début.
+
+Fusionne les intervalles qui se chevauchent.
+
+Somme la durée totale des intervalles fusionnés.
+
+Ça évite de compter deux fois la même période.
+
+4) Convertir en années
+
+Durée totale en mois (plus simple que les jours)
+
+années = mois_total / 12
+
+Arrondi: 1 décimale (ex: 2.7 ans) ou au semestre (0.5)
+
+5) Gérer les cas “stages / projets / part-time”
+
+Tu peux produire plusieurs métriques, ce qui fait plus pro:
+
+Expérience professionnelle totale (CDI/CDD/freelance)
+
+Expérience hors stage (souvent demandé)
+
+Expérience incluant stages
+
+Expérience équivalente temps plein (FTE) si part-time:
+
+si 50% → durée * 0.5
+
+si 3j/5 → durée * 0.6
+
+Même si tu ne détectes pas toujours le % exact, tu peux appliquer FTE فقط quand c’est explicitement mentionné.
+
+6) Stratégie pour fiabilité (anti-“hallucination”)
+
+Calcule uniquement depuis les dates détectées.
+
+Retourne aussi:
+
+“Périodes manquantes”
+
+“Dates incertaines”
+
+“Expériences ignorées (dates absentes)”
+
+Affiche un niveau de confiance:
+
+High: mois+année présents
+
+Medium: années seules
+
+Low: dates ambiguës (“été 2021”)
+
+7) Exemple rapide (logique)
+
+CV:
+
+Jan 2022 → Jun 2023 (CDI)
+
+Mar 2023 → Present (Freelance)
+
+Si tu additionnes naïvement: tu doubles Mar–Jun 2023.
+Avec union:
+
+Jan 2022 → Present = une seule période continue
+Donc expérience = durée réelle, pas gonflée.

@@ -1,0 +1,164 @@
+Pour sortir Top 5 hard skills + Top 5 soft skills avec un niveau (x/5) depuis un CV, le secret n’est pas “une seule IA magique”, mais un petit orchestre: extraction + normalisation + scoring + preuve. 🎻
+
+1) Extraire le texte puis découper en sections
+
+Depuis le PDF, tu récupères le texte puis tu identifies (même grossièrement) des zones:
+
+Skills / Compétences
+
+Expériences
+
+Projets
+
+Certifications
+
+Résumé / Profil
+
+Pourquoi: un skill cité dans “Compétences” + utilisé dans “Expériences” vaut plus qu’un mot perdu dans une ligne.
+
+2) Détecter les skills candidates (liste brute)
+
+Tu construis une liste initiale de skills via 2 sources:
+
+A) Dictionnaire / taxonomy (recommandé)
+
+Hard skills: (Python, SQL, Docker, Kubernetes, FastAPI, React, Git, Linux, AWS…)
+
+Soft skills: (Communication, Leadership, Problem solving, Teamwork, Adaptabilité, Time management…)
+
+→ Avantage: moins d’erreurs, plus stable.
+
+B) Extraction IA (LLM) “ouverte”
+
+Demande au LLM:
+
+“Donne-moi toutes les compétences mentionnées explicitement”
+
+En sortie: liste + citations (extraits) + où trouvé (section)
+
+⚠️ Règle d’or: uniquement ce qui existe dans le CV, pas d’invention.
+
+3) Normaliser (sinon tu auras 10 doublons)
+
+Tu crées un mapping:
+
+“JS” → “JavaScript”
+
+“Postgres” → “PostgreSQL”
+
+“Py” → “Python”
+
+“Problem-Solving” → “Problem solving”
+
+But: regrouper les variantes et compter correctement.
+
+4) Classer Hard vs Soft (hybride = attention)
+
+Méthode simple:
+
+Si le skill est dans ta liste hard → hard
+
+Si dans ta liste soft → soft
+
+Si ambigu (ex: “Architecture”, “Communication technique”) → marque “mixed” et tranche selon contexte.
+
+Astuce: le contexte “outil/tech” vs “comportement” est souvent évident dans la phrase.
+
+5) Calculer un score par skill (le moteur du “Top 5”)
+
+Tu donnes un score à chaque skill selon des signaux. Exemple de scoring (simple et efficace):
+
+Signaux forts
+
+Mention dans section Compétences: +3
+
+Mention dans une expérience: +4
+
+Mention dans un projet: +3
+
+Mention dans une certification: +5
+
+Répétition (max 3 fois): +1 par occurrence
+
+Bonus “preuve d’impact”
+
+Si le skill est lié à un résultat mesurable (“réduit le temps”, “amélioré la perf”, “déployé”):
+
++2
+
+Ensuite tu tries par score:
+
+Top 5 hard = 5 meilleurs hard
+
+Top 5 soft = 5 meilleurs soft
+
+6) Estimer le niveau (x/5) sans inventer
+
+Le niveau doit venir de preuves, pas de télépathie.
+
+Approche recommandée: “niveau = points → /5”
+
+Tu construis un niveau sur 5 basé sur des critères observables:
+
+Niveau 1/5
+
+Skill cité une fois, sans usage concret (“Python” listé, pas d’exemple)
+
+Niveau 2/5
+
+Skill cité + utilisé dans 1 projet/expérience, sans détails
+
+Niveau 3/5
+
+Utilisé dans plusieurs contextes (2+ projets/exp) OU tâches concrètes décrites
+
+Niveau 4/5
+
+responsabilité claire (design, lead, ownership) OU résultats/metrics
+
+Niveau 5/5
+
+Expertise démontrée: lead/mentoring, grosse certification reconnue, projets lourds, contributions significatives (et preuves dans CV)
+
+👉 Important: si tu manques de preuves, tu plafonnes (ex: max 3/5).
+
+Bonus: “confidence”
+
+Ajoute un score confiance (0–1).
+Ex: “SQL 4/5 confidence 0.62” si le CV manque de détails.
+
+7) Sortie structurée (propre pour Odoo)
+
+Tu peux produire un JSON comme ça:
+
+Hard skills:
+
+name
+
+level (1–5)
+
+evidence (2–3 extraits du CV)
+
+score
+
+confidence
+
+Soft skills:
+
+pareil
+
+Ça te permet d’afficher dans Odoo un dossier “compétences” transparent, avec les preuves.
+
+8) Les pièges classiques (et comment les éviter)
+
+Hallucination: l’IA invente “Kubernetes” parce que le profil “a l’air DevOps”
+
+Solution: exiger des citations du texte source pour chaque skill.
+
+Soft skills implicites (“a travaillé en équipe”)
+
+Décide une règle: soit tu prends uniquement les soft skills explicitement nommées, soit tu autorises déduction mais avec confidence basse (perso: MVP = explicite uniquement).
+
+CV trop court: pas assez de détails
+
+Solution: retourne “skills trouvées mais niveau estimé faible”.

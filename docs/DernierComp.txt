@@ -1,0 +1,239 @@
+Très bonne question 👌. Extraire le “Dernier Diplôme” depuis un CV est plus complexe que chercher juste une ligne “Master” ou “Licence”, parce que les CV sont écrits différemment selon les personnes. Voici une approche professionnelle et robuste pour ton projet.
+
+1) Définir clairement ce que veut dire “Dernier Diplôme”
+
+Tu dois choisir une règle sinon ton IA va devenir confuse.
+
+En RH généralement:
+
+👉 Dernier diplôme = diplôme le plus élevé obtenu (niveau académique)
+
+et NON:
+
+la formation la plus récente.
+
+un certificat LinkedIn Learning.
+
+Exemple:
+
+2024 Certification Docker
+2022 Master Data Science
+2019 Licence Informatique
+
+Dernier diplôme = Master (pas Docker).
+
+2) Pipeline recommandé (niveau ATS professionnel)
+PDF CV
+ ↓
+Extraction texte
+ ↓
+Trouver section Education / Formation
+ ↓
+Extraire diplômes candidats
+ ↓
+Normaliser niveaux
+ ↓
+Choisir le plus élevé
+3) Étape 1: Trouver la section Education
+
+Cherche titres:
+
+Français:
+
+Formation
+
+Education
+
+Études
+
+Parcours académique
+
+Diplômes
+
+Anglais:
+
+Education
+
+Academic Background.
+
+Pourquoi?
+
+Sinon tu risques de prendre:
+
+certifications techniques.
+
+bootcamps.
+
+4) Étape 2: Extraire les entrées
+
+Chaque diplôme contient souvent:
+
+année.
+
+diplôme.
+
+école.
+
+spécialité.
+
+Exemple:
+
+2022 — Master Data Science ENSAM Rabat
+2019 — Licence Electronique Université Hassan II
+
+Tu veux transformer ça en structure:
+
+diplome
+ecole
+date
+niveau
+5) Étape 3: Normaliser les diplômes (très important)
+
+Chaque pays écrit différemment:
+
+Exemples:
+
+Ingénieur d'état
+
+Master
+
+MSc
+
+Bac+5
+
+MBA.
+
+Tu dois mapper vers un niveau commun.
+
+Exemple:
+
+Diplôme	Niveau
+Doctorat	6
+Master / Ingénieur	5
+Licence	4
+DUT/BTS	3
+Baccalauréat	2
+
+Pourquoi?
+
+Parce que ensuite:
+
+👉 tu prends le MAX.
+
+6) Étape 4: Choisir le dernier diplôme
+
+Deux stratégies:
+
+A) Par niveau (recommandé)
+
+Tu prends:
+
+niveau max.
+
+Même si ancien.
+
+Exemple:
+
+Doctorat 2018
+Certification AWS 2024
+
+Résultat:
+
+Doctorat.
+
+B) Par date (option secondaire)
+
+Si deux diplômes même niveau:
+
+Master IA 2022
+Master Big Data 2024
+
+Prendre 2024.
+
+7) Problèmes réels que tu vas rencontrer ⚠️
+Certifications mélangées
+
+CV:
+
+AWS certification
+Docker course
+Master informatique
+
+Ne pas confondre.
+
+Solution:
+
+Chercher mots clés:
+
+université.
+
+école.
+
+diplôme national.
+
+Diplôme non terminé
+
+Ex:
+
+Master IA en cours
+
+Décide:
+
+inclure ou non.
+
+RH souvent:
+
+Master (en cours)
+Plusieurs Masters
+
+Choisir:
+
+plus récent.
+
+CV sans section formation
+
+Il arrive.
+
+Solution:
+
+recherche globale dans CV.
+
+8) Bonus niveau senior ⭐
+
+Retourne aussi:
+
+niveau confiance extraction.
+
+diplôme source (texte original).
+
+Exemple:
+
+Master Data Science
+Confidence : 92%
+Source : ligne 42 du CV
+
+RH adore.
+
+9) Architecture idéale pour ton projet
+
+Ton moteur retourne:
+
+last_degree:
+{
+ degree : Master Data Science
+ level : Bac+5
+ school : ENSAM Rabat
+ year : 2022
+ confidence : 0.93
+}
+
+Odoo stocke simplement.
+
+10) Conseil ENSAM / Stage (très important)
+
+Ne laisse pas le LLM inventer.
+
+Toujours:
+
+Ne pas inventer d'information absente.
+Si doute → confidence basse.

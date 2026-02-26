@@ -1,0 +1,331 @@
+Excellent 👌. Là tu touches le cœur d’un vrai ATS intelligent. Si tu fais ça correctement, ton projet devient très crédible (niveau entreprise RH / ESN).
+
+Tu veux:
+
+uniquement du réel depuis le CV
+
+éviter hallucination IA
+
+pas d’estimation pour la taille équipe.
+
+👉 Je vais te proposer une architecture professionnelle + règles strictes d’extraction.
+
+⭐ 1) Principe fondamental (très important)
+
+Ne demande jamais directement:
+
+“Donne-moi expériences structurées.”
+
+Sinon le LLM va inventer.
+
+À la place:
+
+👉 Extraction basée sur preuves (“evidence based extraction”).
+
+Chaque champ doit avoir:
+
+source textuelle.
+
+confiance.
+
+⭐ 2) Pipeline recommandé (niveau senior)
+PDF CV
+ ↓
+Extraction texte brut
+ ↓
+Découpage sections
+ ↓
+Détection expériences
+ ↓
+Extraction structurée par expérience
+ ↓
+Validation anti hallucination
+ ↓
+Stockage JSON
+⭐ 3) Détection expériences
+
+Cherche sections:
+
+Expérience professionnelle.
+
+Professional Experience.
+
+Work Experience.
+
+Parcours.
+
+Mais aussi fallback:
+
+Cherche patterns:
+
+2023 - Present
+Jan 2022 – May 2024
+
+Dates = signal fort.
+
+⭐ 4) Extraction champ par champ (le plus important)
+A) Date début / Date fin ✅
+
+Très fiable.
+
+Cherche patterns:
+
+01/2022.
+
+Jan 2022.
+
+Règles:
+
+Présent / Now:
+
+→ date actuelle.
+
+Année seule:
+
+→ marque précision faible.
+
+Toujours garder texte original.
+
+Ex:
+
+source : "Jan 2022 - Present"
+confidence : High.
+B) Poste occupé ✅
+
+Souvent:
+
+ligne juste après date.
+
+Ex:
+
+Backend Developer
+Company X.
+
+Ou:
+
+Backend Developer at Orange.
+
+Règle:
+
+prendre première ligne métier.
+
+Pas IA créative.
+
+C) Entreprise ✅
+
+Cherche:
+
+“at”.
+
+“chez”.
+
+ou nom organisation capitalisé.
+
+Bonus:
+
+LinkedIn mention.
+
+D) Résumé mission ✅
+
+Tu prends:
+
+bullet points description.
+
+Ex:
+
+Developed APIs.
+Maintained database.
+
+Tu ne réécris pas.
+
+Tu peux:
+
+nettoyer grammaticalement.
+
+mais pas ajouter contenu.
+
+E) Réalisations ⭐⭐⭐⭐⭐
+
+Très important.
+
+Cherche:
+
+metrics.
+
+Ex:
+
+Improved performance by 30%.
+Reduced latency.
+Delivered platform used by 1000 users.
+
+Verbes forts:
+
+improved.
+
+reduced.
+
+achieved.
+
+delivered.
+
+Sinon:
+
+champ vide.
+
+Jamais inventer.
+
+F) Technologies ✅
+
+Extraction hybride:
+
+dictionnaire outils.
+
+phrases expériences.
+
+Ex:
+
+developed FastAPI services deployed with Docker.
+
+Tu prends:
+
+FastAPI.
+
+Docker.
+
+PostgreSQL.
+
+Toujours preuves.
+
+G) Méthodologies ⭐⭐⭐
+
+Cherche mots:
+
+Agile.
+
+Scrum.
+
+Kanban.
+
+CI/CD.
+
+DevOps.
+
+Souvent:
+
+Agile Scrum environment.
+
+Sinon:
+
+vide.
+
+H) Taille équipe (IMPORTANT selon toi)
+
+Tu veux ZERO estimation.
+
+Donc:
+
+Seulement si CV dit:
+
+team of 5 engineers.
+worked with 10 developers.
+
+Sinon:
+
+team_size = null.
+
+Jamais deviner.
+
+Même IA forte:
+
+interdit.
+
+⭐ 5) Anti hallucination (obligatoire)
+
+Prompt règle:
+
+Ne jamais inventer.
+Si information absente → null.
+Chaque champ doit avoir citation CV.
+⭐ 6) Format JSON recommandé
+
+Ton moteur renvoie:
+
+expérience:
+
+dates.
+
+poste.
+
+entreprise.
+
+mission.
+
+réalisations.
+
+technologies.
+
+méthodologies.
+
+taille équipe.
+
+preuves.
+
+confiance.
+
+Odoo ensuite affiche proprement.
+
+⭐ 7) Défis réels que tu vas rencontrer
+CV mal structuré
+
+Dates au milieu.
+
+Solution:
+
+pattern detection.
+
+Missions mélangées
+
+Même entreprise plusieurs rôles.
+
+Solution:
+
+split par dates.
+
+CV courts
+
+Ex:
+
+Backend developer Orange.
+
+Pas grave.
+
+Beaucoup null.
+
+⭐ 8) Bonus très très fort (je recommande)
+
+Ajoute:
+
+missing_information.
+
+Ex:
+
+team_size missing.
+methodology missing.
+
+RH peut compléter.
+
+⭐⭐⭐⭐⭐ Recommandation finale (très importante)
+
+Ne fais PAS:
+
+IA → dossier final direct.
+
+Fais:
+
+IA → extraction FACTUELLE.
+
+Puis:
+
+Odoo → génération narrative.
+
+Tu maîtrises qualité.

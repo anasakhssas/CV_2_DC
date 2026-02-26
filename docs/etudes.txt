@@ -1,0 +1,246 @@
+Très bon 👍. Pour les études (formation académique) tu peux faire quelque chose de très fiable, simple et professionnel, sans hallucination IA.
+
+Tu veux seulement:
+
+✅ année du diplôme
+✅ nom du diplôme
+
+Donc on va construire une extraction 100% basée sur preuves CV.
+
+⭐ 1) Pipeline recommandé (simple et solide)
+PDF CV
+ ↓
+Extraction texte
+ ↓
+Trouver section Education / Formation
+ ↓
+Extraire entrées formation
+ ↓
+Nettoyage + validation
+ ↓
+Retour structuré
+⭐ 2) Trouver la section Études
+
+Cherche titres:
+
+Français:
+
+Formation
+
+Études
+
+Parcours académique
+
+Diplômes.
+
+Anglais:
+
+Education
+
+Academic Background.
+
+Pourquoi?
+
+Parce que sinon tu vas mélanger avec:
+
+certifications.
+
+bootcamps.
+
+⭐ 3) Détecter les entrées diplôme
+
+Dans cette section cherche patterns:
+
+Exemple réel CV:
+2022 — Master Data Science ENSAM Rabat
+2019 — Licence Electronique Université Hassan II
+2016 — Baccalauréat Sciences Mathématiques.
+
+ou:
+
+Master Data Science 2022
+ENSAM Rabat.
+
+ou:
+
+2019 - 2022 Master Data Science.
+
+Donc:
+
+👉 dates proches d’un diplôme.
+
+⭐ 4) Extraire année diplôme (très fiable)
+
+Cherche:
+
+YYYY.
+
+Tu prends:
+
+priorité:
+
+année fin.
+
+Ex:
+
+2019 - 2022 Master.
+
+→ année diplôme = 2022.
+
+Cas:
+
+Master en cours 2024.
+
+Décide:
+
+soit:
+
+status = en cours.
+
+ou ignore.
+
+⭐ 5) Extraire nom diplôme
+
+Cherche mots clés académiques:
+
+Français:
+
+Master.
+
+Licence.
+
+Ingénieur.
+
+Doctorat.
+
+DUT.
+
+BTS.
+
+Bac.
+
+Anglais:
+
+Bachelor.
+
+MSc.
+
+PhD.
+
+Tu prends ligne contenant diplôme.
+
+Ne réécris pas.
+
+Juste nettoyage.
+
+⭐ 6) Anti hallucination (important)
+
+Règles:
+
+Ne jamais compléter spécialité absente.
+
+Ne jamais inventer école.
+
+Si écrit:
+
+Master informatique.
+
+Tu gardes.
+
+Pas:
+
+Master informatique spécialité IA.
+⭐ 7) Cas difficiles ⚠️
+Plusieurs diplômes même ligne
+
+Ex:
+
+Licence Electronique et Master IA ENSAM.
+
+Split.
+
+Formation courte
+
+Ex:
+
+2023 AWS certification.
+
+Tu peux exclure si tu veux académique seulement.
+
+CV sans section Education
+
+Fallback:
+
+cherche globalement:
+
+Master.
+
+Licence.
+
+Ingénieur.
+
+⭐ 8) Validation intelligente
+
+Ignore lignes contenant:
+
+certification.
+
+training.
+
+workshop.
+
+Si tu veux uniquement académique.
+
+⭐ 9) Sortie recommandée (pour Odoo)
+
+Ton moteur retourne:
+
+liste études.
+
+Chaque entrée:
+
+année diplôme.
+
+nom diplôme.
+
+preuve texte.
+
+confidence.
+
+Ex:
+
+Master Data Science.
+
+année:
+
+preuve:
+
+"2022 Master Data Science ENSAM".
+
+confidence:
+
+High.
+
+⭐ 10) Bonus professionnel (je recommande)
+
+Ajoute:
+
+degree_level.
+
+Bac+5.
+
+Bac+3.
+
+Doctorat.
+
+Très utile plus tard.
+
+⭐⭐⭐⭐⭐ Conseil important
+
+Ne laisse pas le LLM créer la liste.
+
+Fais:
+
+Extraction pattern → validation IA.
+
+Pas l’inverse.
