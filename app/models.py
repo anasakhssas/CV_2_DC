@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 # forward ref
 __all__ = [
-    "Education", "LastDegree", "Experience", "YearsOfExperience",
+    "Education", "LastDegree", "Experience",
     "Language", "Skill", "Tool", "PhotoResult", "DossierCompetences",
 ]
 
@@ -45,15 +45,6 @@ class Experience(BaseModel):
     evidence: Optional[str] = None
     confidence: float = Field(1.0, ge=0, le=1)
 
-
-# ── Années d'expérience ─────────────────────────────────────
-class YearsOfExperience(BaseModel):
-    total_months: int = 0
-    total_years: float = 0.0
-    total_years_excluding_internships: float = 0.0
-    intervals: list[dict] = Field(default_factory=list, description="Intervalles fusionnés")
-    missing_dates: list[str] = Field(default_factory=list)
-    confidence: float = Field(1.0, ge=0, le=1)
 
 
 # ── Langues ─────────────────────────────────────────────────
@@ -96,7 +87,8 @@ class PhotoResult(BaseModel):
 class DossierCompetences(BaseModel):
     # Infos générales
     source_file: str
-    extraction_date: str    candidate_name: Optional[str] = Field(None, description="Nom du candidat")
+    extraction_date: str
+    candidate_name: Optional[str] = Field(None, description="Nom du candidat")
     candidate_name_confidence: float = Field(0.0, ge=0, le=1)
     # Photo
     photo: PhotoResult = Field(default_factory=PhotoResult)
@@ -107,7 +99,6 @@ class DossierCompetences(BaseModel):
 
     # Expériences
     experiences: list[Experience] = Field(default_factory=list)
-    years_of_experience: Optional[YearsOfExperience] = None
 
     # Langues (top 3)
     languages: list[Language] = Field(default_factory=list)

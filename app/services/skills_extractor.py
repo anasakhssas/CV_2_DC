@@ -203,7 +203,13 @@ def extract_top_tools(text: str) -> list[Tool]:
         "evidence": [],
     })
 
+    # Hard-skill items that ended up in TOOLS_TAXONOMY should NOT appear as
+    # separate tools — they are already scored under hard_skills.
+    _hard_lower = {s.lower() for s in HARD_SKILLS_TAXONOMY}
+
     for tool in TOOLS_TAXONOMY:
+        if tool.lower() in _hard_lower:
+            continue          # skip: already a hard skill
         pattern = re.compile(r"(?i)\b" + re.escape(tool) + r"\b")
         for m in pattern.finditer(text):
             line_start = text.rfind("\n", 0, m.start())
@@ -234,6 +240,14 @@ def extract_top_tools(text: str) -> list[Tool]:
 
     tools: list[Tool] = []
     for key, data in tool_data.items():
+        # Minimum quality gate: at least 2 mentions OR a meaningful section score
+        # (score >= 4 means ≥1 mention inside an experience/project/cert section).
+        # This eliminates single incidental mentions like "GitLab and SonarQube".
+        if data["mentions"] < 2 and data["score"] < 4:
+            logger.debug("Tool '%s' filtered out (score=%.1f, mentions=%d)",
+                         data["name"], data["score"], data["mentions"])
+            continue
+
         level = _compute_level(data["score"], data["has_impact"], data["mentions"])
         confidence = min(1.0, 0.3 + data["mentions"] * 0.15 + (0.2 if data["has_impact"] else 0))
 

@@ -9,16 +9,24 @@ from app.config import DEGREE_LEVELS, DEGREE_LEVEL_LABELS
 
 logger = logging.getLogger(__name__)
 
-# ── Patterns de section ─────────────────────────────────────
-_SECTION_PATTERNS = re.compile(
-    r"(?i)^[\s#*\-]*("
-    r"formation|études|etudes|parcours\s*académique|parcours\s*academique|"
-    r"diplômes|diplomes|education|academic\s*background"
-    r")\s*$",
+# Heading pattern – lenient: match anywhere on a line, allow trailing content
+_SECTION_HEADING = re.compile(
+    r"(?i)(?:^|\n)[^\n]*\b("
+    r"formations?|\u00e9tudes|etudes|parcours\s*acad[e\u00e9]mique|"
+    r"dipl[o\u00f4]mes?|education|academic\s*background|scolarit[e\u00e9]"
+    r")\b",
     re.MULTILINE,
 )
 
-# Mots clés diplômes académiques
+# Next-section heading to determine where education ends
+_NEXT_SECTION_HEADING = re.compile(
+    r"(?i)(?:^|\n)[^\n]*\b("
+    r"exp[e\u00e9]riences?|professional\s*experience|work\s*experience|emploi|"
+    r"comp[e\u00e9]tences?|skills|langues?|languages?|certif|projets?|projects?|"
+    r"loisirs?|hobbies?|interests?|r[e\u00e9]f[e\u00e9]rences?|contact|profil|summary"
+    r")\b",
+    re.MULTILINE,
+)
 _DEGREE_KEYWORDS = re.compile(
     r"(?i)\b("
     r"doctorat|phd|doctorate|"
@@ -29,37 +37,50 @@ _DEGREE_KEYWORDS = re.compile(
     r")\b"
 )
 
-# Pattern année
-_YEAR_PATTERN = re.compile(r"\b(19|20)\d{2}\b")
+# Pattern année ── non-capturing group pour que findall retourne l'année entière
+_YEAR_PATTERN = re.compile(r"\b(?:19|20)\d{2}\b")
+
+# Ligne qui ressemble à une plage de dates (expérience) : JJ/MM/AAAA - JJ/MM/AAAA
+_DATE_RANGE_LINE = re.compile(
+    r"(?i)^\s*(?:\d{1,2}[/\-])?(?:\d{1,2}[/\-])?(?:19|20)\d{2}"
+    r"\s*[\-–—à/]\s*"
+    r"(?:\d{1,2}[/\-])?(?:\d{1,2}[/\-])?(?:(?:19|20)\d{2}|présent|present|actuel)"
+)
 
 # Mots à exclure (certifications, pas diplômes)
 _EXCLUDE_KEYWORDS = re.compile(
     r"(?i)\b(certification|certificate|training|workshop|bootcamp|course|mooc|udemy|coursera|linkedin)\b"
 )
 
+# Indicateurs d'école / établissement
+_SCHOOL_KEYWORDS = re.compile(
+    r"(?i)\b("
+    r"université|universite|university|école|ecole|school|"
+    r"institut|institute|faculty|faculté|faculte|"
+    r"ensam|ensa|enset|est|iut|iup|cpge|classes? prépa|"
+    r"lycée|lycee|college|hautes?\s*études|grandes?\s*écoles?"
+    r")\b"
+)
+
+
+def find_education_section(text: str) -> str:
+    """Trouve et retourne la section éducation du CV (API publique)."""
+    return _find_education_section(text)
+
 
 def _find_education_section(text: str) -> str:
     """Trouve et retourne la section éducation du CV."""
-    matches = list(_SECTION_PATTERNS.finditer(text))
-    if not matches:
+    m = _SECTION_HEADING.search(text)
+    if not m:
         return ""
 
-    # Prendre la première correspondance
-    start = matches[0].end()
+    # Start after the matched heading line
+    start = text.index("\n", m.start()) + 1 if "\n" in text[m.start():] else m.end()
 
-    # Trouver la prochaine section (titre en majuscules ou pattern section)
-    next_section = re.search(
-        r"(?i)^[\s#*\-]*("
-        r"expérience|experience|compétence|competence|skills|"
-        r"projet|project|langue|language|certif|"
-        r"loisir|hobby|intérêt|interest|profil|profile|"
-        r"référence|reference|contact"
-        r")\b",
-        text[start:],
-        re.MULTILINE,
-    )
+    # Find end: next known section heading that appears AFTER start
+    next_m = _NEXT_SECTION_HEADING.search(text, start)
+    end = next_m.start() if next_m else len(text)
 
-    end = start + next_section.start() if next_section else len(text)
     return text[start:end].strip()
 
 
@@ -79,23 +100,35 @@ def _extract_entries_from_section(section: str) -> list[dict]:
         if _EXCLUDE_KEYWORDS.search(line_stripped):
             continue
 
-        # Chercher si la ligne contient un diplôme
+        # Ignorer les lignes qui ressemblent à des plages de dates d'expérience
+        if _DATE_RANGE_LINE.match(line_stripped) and not _DEGREE_KEYWORDS.search(line_stripped):
+            continue
+
         degree_match = _DEGREE_KEYWORDS.search(line_stripped)
         years = _YEAR_PATTERN.findall(line_stripped)
 
-        if degree_match or years:
+        if degree_match or (years and not _DATE_RANGE_LINE.match(line_stripped)):
             if current_entry and current_entry.get("degree"):
                 entries.append(current_entry)
 
             current_entry = {
                 "degree": line_stripped,
+                "school": None,
                 "years": [int(y) for y in years],
                 "evidence": line_stripped,
             }
         elif current_entry:
-            # Ligne supplémentaire (école, spécialité…)
-            current_entry["degree"] += " " + line_stripped
-            current_entry["evidence"] += " | " + line_stripped
+            # Ligne supplémentaire : détecter école ou enrichir le diplôme
+            if _SCHOOL_KEYWORDS.search(line_stripped) and not current_entry["school"]:
+                current_entry["school"] = line_stripped
+                current_entry["evidence"] += " | " + line_stripped
+            elif not current_entry["school"] and not _YEAR_PATTERN.search(line_stripped):
+                # Deuxième ligne non-date → probablement l'école
+                current_entry["school"] = line_stripped
+                current_entry["evidence"] += " | " + line_stripped
+            else:
+                current_entry["degree"] += " " + line_stripped
+                current_entry["evidence"] += " | " + line_stripped
 
     if current_entry and current_entry.get("degree"):
         entries.append(current_entry)
@@ -153,6 +186,7 @@ def extract_educations(text: str) -> list[Education]:
         educations.append(Education(
             year=year,
             degree=degree_text.strip(),
+            school=entry.get("school"),
             degree_level=level_label if level_num > 0 else None,
             status=status,
             evidence=entry.get("evidence", ""),

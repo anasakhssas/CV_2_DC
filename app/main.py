@@ -19,11 +19,10 @@ from app.utils.helpers import clean_text
 
 from app.services.pdf_extractor import extract_pdf
 from app.services.photo_extractor import extract_photo
-from app.services.education_extractor import extract_educations, determine_last_degree
+from app.services.education_extractor import extract_educations, determine_last_degree, find_education_section
 from app.services.experience_extractor import extract_experiences
 from app.services.skills_extractor import extract_skills, extract_top_tools
 from app.services.language_extractor import extract_languages
-from app.services.years_calculator import calculate_years_of_experience
 from app.services.name_extractor import extract_candidate_name
 from app.services import llm_service
 
@@ -169,11 +168,7 @@ async def extract_full(file: UploadFile = File(...)):
         if not experiences:
             missing_info.append("Aucune expérience détectée")
 
-        # ── 6. Années d'expérience ───────────────────────
-        years_exp = calculate_years_of_experience(experiences)
-        missing_info.extend(years_exp.missing_dates)
-
-        # ── 7. Langues ───────────────────────────────────
+        # ── 6. Langues ───────────────────────────────────
         languages = extract_languages(text)
         if not languages:
             missing_info.append("Aucune langue détectée")
@@ -193,8 +188,56 @@ async def extract_full(file: UploadFile = File(...)):
         # ── LLM Enhancement (optionnel) ──────────────────
         if llm_service.is_available():
             logger.info("🤖 Enrichissement LLM activé")
-            # On pourrait enrichir les expériences et formations ici
-            # Pour le MVP, on garde l'extraction par patterns
+
+            # Enrichissement formations
+            edu_section = find_education_section(text)
+            llm_edu = llm_service.enhance_education(text, section_text=edu_section or None)
+            if llm_edu and llm_edu.get("educations"):
+                from app.models import Education as EduModel
+                llm_educations = []
+                for e in llm_edu["educations"]:
+                    try:
+                        llm_educations.append(EduModel(
+                            year=e.get("year"),
+                            degree=e.get("degree", ""),
+                            school=e.get("school"),
+                            degree_level=e.get("degree_level"),
+                            status=e.get("status", "obtained"),
+                            evidence=e.get("evidence", "")[:500],
+                            confidence=0.9,
+                        ))
+                    except Exception as llm_e:
+                        logger.warning("Formation LLM invalide ignorée: %s", llm_e)
+                if llm_educations:
+                    educations = llm_educations
+                    last_degree = determine_last_degree(educations)
+                    logger.info("✅ %d formation(s) extraites via LLM", len(educations))
+
+            # Enrichissement expériences
+            llm_exp = llm_service.enhance_experiences(text)
+            if llm_exp and llm_exp.get("experiences"):
+                from app.models import Experience as ExpModel
+                llm_experiences = []
+                for e in llm_exp["experiences"]:
+                    try:
+                        llm_experiences.append(ExpModel(
+                            start_date=e.get("start_date"),
+                            end_date=e.get("end_date"),
+                            position=e.get("position"),
+                            company=e.get("company"),
+                            mission_summary=e.get("mission_summary"),
+                            achievements=e.get("achievements") or [],
+                            technologies=e.get("technologies") or [],
+                            methodologies=e.get("methodologies") or [],
+                            team_size=e.get("team_size"),
+                            evidence=e.get("evidence", "")[:500],
+                            confidence=0.9,
+                        ))
+                    except Exception as llm_e:
+                        logger.warning("Expérience LLM invalide ignorée: %s", llm_e)
+                if llm_experiences:
+                    experiences = llm_experiences
+                    logger.info("✅ %d expérience(s) extraites via LLM", len(experiences))
 
         # ── Confiance globale ────────────────────────────
         confidences = []
@@ -204,9 +247,6 @@ async def extract_full(file: UploadFile = File(...)):
             confidences.append(e.confidence)
         for l in languages:
             confidences.append(l.confidence)
-        if years_exp:
-            confidences.append(years_exp.confidence)
-
         overall = round(sum(confidences) / len(confidences), 2) if confidences else 0.5
 
         # ── Construire le dossier ────────────────────────
@@ -219,7 +259,6 @@ async def extract_full(file: UploadFile = File(...)):
             educations=educations,
             last_degree=last_degree,
             experiences=experiences,
-            years_of_experience=years_exp,
             languages=languages,
             hard_skills=hard_skills,
             soft_skills=soft_skills,
@@ -265,8 +304,53 @@ async def extract_education_only(file: UploadFile = File(...)):
     pdf_content = extract_pdf(pdf_path)
     text = clean_text(pdf_content.text)
     educations = extract_educations(text)
+
+    if llm_service.is_available():
+        edu_section = find_education_section(text)
+        logger.info("Education section found: %d chars", len(edu_section))
+        llm_edu = llm_service.enhance_education(text, section_text=edu_section or None)
+        logger.info("LLM education result keys: %s", list(llm_edu.keys()) if llm_edu else "None")
+        if llm_edu and llm_edu.get("educations"):
+            from app.models import Education as EduModel
+            llm_educations = []
+            for e in llm_edu["educations"]:
+                try:
+                    llm_educations.append(EduModel(
+                        year=e.get("year"),
+                        degree=e.get("degree", ""),
+                        school=e.get("school"),
+                        degree_level=e.get("degree_level"),
+                        status=e.get("status", "obtained"),
+                        evidence=e.get("evidence", "")[:500],
+                        confidence=0.9,
+                    ))
+                except Exception as llm_e:
+                    logger.warning("Formation LLM invalide ignorée: %s | data=%s", llm_e, e)
+            if llm_educations:
+                educations = llm_educations
+                logger.info("✅ %d formation(s) LLM utilisées", len(educations))
+            else:
+                logger.warning("LLM returned educations list but none passed validation")
+
     last_degree = determine_last_degree(educations)
     return {"educations": educations, "last_degree": last_degree}
+
+
+@app.post("/debug/text", include_in_schema=False)
+async def debug_text(file: UploadFile = File(...)):
+    """Debug: retourne le texte brut extrait du PDF (ne pas exposer en production)."""
+    pdf_path = await _save_upload(file)
+    pdf_content = extract_pdf(pdf_path)
+    raw = pdf_content.text
+    cleaned = clean_text(raw)
+    lines = cleaned.split("\n")
+    return {
+        "num_pages": pdf_content.num_pages,
+        "num_chars": len(cleaned),
+        "num_lines": len(lines),
+        "lines": lines,          # full line list for inspection
+        "text": cleaned,
+    }
 
 
 @app.post("/extract/experiences")
@@ -276,8 +360,33 @@ async def extract_experiences_only(file: UploadFile = File(...)):
     pdf_content = extract_pdf(pdf_path)
     text = clean_text(pdf_content.text)
     experiences = extract_experiences(text)
-    years_exp = calculate_years_of_experience(experiences)
-    return {"experiences": experiences, "years_of_experience": years_exp}
+
+    if llm_service.is_available():
+        llm_exp = llm_service.enhance_experiences(text)
+        if llm_exp and llm_exp.get("experiences"):
+            from app.models import Experience as ExpModel
+            llm_experiences = []
+            for e in llm_exp["experiences"]:
+                try:
+                    llm_experiences.append(ExpModel(
+                        start_date=e.get("start_date"),
+                        end_date=e.get("end_date"),
+                        position=e.get("position"),
+                        company=e.get("company"),
+                        mission_summary=e.get("mission_summary"),
+                        achievements=e.get("achievements") or [],
+                        technologies=e.get("technologies") or [],
+                        methodologies=e.get("methodologies") or [],
+                        team_size=e.get("team_size"),
+                        evidence=e.get("evidence", "")[:500],
+                        confidence=0.9,
+                    ))
+                except Exception as llm_e:
+                    logger.warning("Expérience LLM invalide ignorée: %s", llm_e)
+            if llm_experiences:
+                experiences = llm_experiences
+
+    return {"experiences": experiences}
 
 
 @app.post("/extract/skills")

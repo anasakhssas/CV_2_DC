@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 # ── Patterns ────────────────────────────────────────────────
 _SECTION_PATTERNS = re.compile(
     r"(?i)^[\s#*\-]*("
-    r"expérience|experience|parcours\s*professionnel|"
+    r"expériences?|experiences?|parcours\s*professionnel|"
     r"professional\s*experience|work\s*experience|emploi"
-    r")\s*(professionnelle|professional)?\s*$",
+    r")\s*(professionnelles?|professional)?\s*[:\-]?\s*$",
     re.MULTILINE,
 )
 
@@ -156,41 +156,54 @@ def _parse_experience_block(block: str) -> Experience:
     end_date = None
     date_range = _DATE_RANGE_PATTERN.search(block)
     if date_range:
-        parts = date_range.group().split()
-        # Simplification : garder le texte brut
-        full = date_range.group()
-        sep_match = re.search(r"[\-–—à/]", full[4:])  # skip first date chars
-        if sep_match:
-            idx = sep_match.start() + 4
-            start_date = full[:idx].strip().rstrip("-–—à/").strip()
-            end_date = full[idx:].strip().lstrip("-–—à/").strip()
-        else:
-            start_date = full.strip()
+        # group(1) = full start date, group(3) = full end date
+        start_date = date_range.group(1).strip() if date_range.group(1) else None
+        end_date = date_range.group(3).strip() if date_range.group(3) else None
+        if end_date and _PRESENT_KEYWORDS.search(end_date):
+            end_date = "présent"
     elif _DATE_PATTERN.search(block):
         dates_found = _DATE_PATTERN.findall(block)
         if dates_found:
             start_date = dates_found[0][0] if dates_found[0][0] else str(dates_found[0])
 
-    # ── Poste ────────────────────────────────────────────
+    # ── Poste & Entreprise (format pipe: date | poste | entreprise) ──────
     position = None
-    for line in lines[:3]:
-        line_clean = line.strip().strip("-–•*")
-        # Ignorer lignes de date pure
-        if line_clean and not re.match(r"^[\d/\-\s]+$", line_clean):
-            # Ignorer si c'est juste une date range
-            if _DATE_RANGE_PATTERN.fullmatch(line_clean):
-                continue
-            position = line_clean
+    company = None
+
+    # Chercher la ligne qui contient la plage de dates
+    date_line = ""
+    for line in lines[:5]:
+        if _DATE_RANGE_PATTERN.search(line):
+            date_line = line
             break
 
-    # ── Entreprise ───────────────────────────────────────
-    company = None
-    for line in lines[:5]:
-        line_clean = line.strip()
-        at_match = re.search(r"(?i)\b(?:at|chez|@|,)\s+(.+)", line_clean)
-        if at_match:
-            company = at_match.group(1).strip()
-            break
+    if date_line:
+        # Retirer la date range de la ligne, garder le reste
+        rest = _DATE_RANGE_PATTERN.sub("", date_line).strip().strip("|– \t")
+        pipe_parts = [p.strip() for p in rest.split("|") if p.strip()]
+        if len(pipe_parts) >= 2:
+            position = pipe_parts[0]
+            company = pipe_parts[1]
+        elif len(pipe_parts) == 1:
+            position = pipe_parts[0]
+
+    # Fallback poste : premières lignes non-date
+    if not position:
+        for line in lines[:4]:
+            line_clean = line.strip().strip("-–•*")
+            if line_clean and not re.match(r"^[\d/\-\s]+$", line_clean):
+                if not _DATE_RANGE_PATTERN.fullmatch(line_clean):
+                    position = line_clean
+                    break
+
+    # Fallback entreprise : patterns at/chez/@
+    if not company:
+        for line in lines[:6]:
+            line_clean = line.strip()
+            at_match = re.search(r"(?i)\b(?:at|chez|@)\s+(.+)", line_clean)
+            if at_match:
+                company = at_match.group(1).strip()
+                break
 
     # ── Mission / Description ────────────────────────────
     bullet_lines = []

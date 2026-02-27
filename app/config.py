@@ -60,36 +60,85 @@ LANGUAGE_LEVEL_MAP: dict[str, float] = {
     "beginner": 1, "débutant": 1, "a1": 1,
 }
 
-# ── Taxonomie compétences ───────────────────────────────────
+# ── Taxonomie compétences (ce que l'on SAIT FAIRE) ──────────
+# Hard skills = domaines de compétence / savoir-faire métier,
+# PAS des technologies (celles-ci vont dans TOOLS_TAXONOMY).
 HARD_SKILLS_TAXONOMY: set[str] = {
-    "python", "java", "javascript", "typescript", "c", "c++", "c#", "go",
-    "rust", "ruby", "php", "swift", "kotlin", "scala", "r", "matlab",
-    "sql", "nosql", "mongodb", "postgresql", "mysql", "oracle", "redis",
-    "elasticsearch", "neo4j", "cassandra", "sqlite",
-    "react", "angular", "vue", "vue.js", "next.js", "nuxt.js", "svelte",
-    "html", "css", "sass", "tailwind", "bootstrap",
-    "node.js", "express", "fastapi", "django", "flask", "spring",
-    "spring boot", "laravel", "asp.net", ".net",
-    "docker", "kubernetes", "terraform", "ansible", "jenkins", "gitlab ci",
-    "github actions", "ci/cd", "nginx", "apache",
-    "aws", "azure", "gcp", "google cloud", "heroku", "digitalocean",
-    "linux", "windows server", "bash", "powershell",
-    "git", "svn", "jira", "confluence", "trello",
-    "tensorflow", "pytorch", "keras", "scikit-learn", "pandas", "numpy",
-    "spark", "hadoop", "airflow", "kafka", "rabbitmq",
-    "power bi", "tableau", "grafana", "kibana",
-    "figma", "adobe xd", "photoshop", "illustrator",
-    "rest", "graphql", "grpc", "websocket", "soap",
-    "microservices", "architecture", "design patterns",
-    "machine learning", "deep learning", "nlp", "computer vision",
-    "data science", "data engineering", "etl", "data warehouse",
-    "devops", "sre", "agile", "scrum", "kanban",
-    "selenium", "cypress", "jest", "junit", "pytest",
-    "oauth", "jwt", "ssl", "tls",
-    "blockchain", "solidity", "web3",
-    "unity", "unreal engine",
-    "excel", "word", "powerpoint",
-    "sap", "odoo", "salesforce",
+    # ── Data & IA ──────────────────────────────────────────
+    "machine learning", "deep learning",
+    "computer vision", "vision par ordinateur",
+    "nlp", "natural language processing",
+    "traitement du langage naturel", "traitement automatique du langage",
+    "text mining", "sentiment analysis", "analyse de sentiment",
+    "data science", "data engineering",
+    "data analysis", "analyse de données", "analyse des données",
+    "data preprocessing", "préparation des données", "préparation de données",
+    "feature engineering",
+    "statistical analysis", "analyse statistique", "statistiques",
+    "predictive modeling", "modélisation prédictive",
+    "model training", "entraînement de modèles",
+    "model optimization", "optimisation de modèles",
+    "model evaluation", "évaluation de modèles",
+    "data visualization", "visualisation de données", "visualisation des données",
+    "business intelligence",
+    "etl", "data pipeline", "pipeline de données",
+    "data warehouse", "data warehousing",
+    "big data", "data lake",
+    "recommender system", "système de recommandation",
+    "time series", "série temporelle", "prévision",
+    "generative ai", "ia générative", "llm", "large language model",
+    "prompt engineering",
+    "rag", "retrieval augmented generation",
+    # ── Développement logiciel ─────────────────────────────
+    "backend development", "développement backend",
+    "frontend development", "développement frontend",
+    "full-stack development", "full stack", "full-stack",
+    "web development", "développement web",
+    "mobile development", "développement mobile",
+    "api design", "conception d'api", "conception api",
+    "rest api", "api rest", "restful api",
+    "graphql", "grpc", "websocket", "soap",
+    "microservices", "architecture microservices",
+    "software architecture", "architecture logicielle",
+    "system design", "conception de système",
+    "database design", "conception de base de données", "modélisation de données",
+    "object-oriented programming", "programmation orientée objet", "oop",
+    "functional programming", "programmation fonctionnelle",
+    "design patterns", "clean code", "solid principles",
+    "unit testing", "tests unitaires",
+    "integration testing", "tests d'intégration",
+    "test-driven development", "tdd",
+    "web scraping", "automatisation",
+    # ── DevOps / Infra / Cloud ─────────────────────────────
+    "devops", "devsecops", "sre",
+    "ci/cd", "intégration continue", "continuous integration",
+    "continuous deployment", "continuous delivery",
+    "cloud computing", "cloud architecture", "architecture cloud",
+    "cloud deployment", "déploiement cloud",
+    "containerization", "conteneurisation",
+    "infrastructure as code",
+    "monitoring", "observabilité",
+    # ── Sécurité ───────────────────────────────────────────
+    "cybersecurity", "cybersécurité", "sécurité informatique",
+    "penetration testing", "test d'intrusion",
+    "secure coding", "codage sécurisé",
+    # ── Méthodes & Management ──────────────────────────────
+    "agile", "scrum", "kanban",
+    "project management", "gestion de projet",
+    "technical leadership", "lead technique",
+    "code review", "revue de code",
+    "business analysis", "analyse métier",
+    "reporting",
+    # ── Domaines métier ────────────────────────────────────
+    "finance", "comptabilité", "accounting",
+    "marketing digital", "seo", "e-commerce",
+    "embedded systems", "systèmes embarqués",
+    "iot", "internet of things",
+    "blockchain", "web3", "smart contracts",
+    "game development", "développement de jeux",
+    "erp", "crm",
+    "network administration", "administration réseau",
+    "linux administration", "administration système",
 }
 
 SOFT_SKILLS_TAXONOMY: set[str] = {
@@ -115,57 +164,118 @@ SOFT_SKILLS_TAXONOMY: set[str] = {
     "public speaking", "prise de parole en public",
 }
 
-# ── Taxonomie Outils maîtrisés ─────────────────────────────
+# ── Taxonomie Outils / Technologies (ce que l'on UTILISE) ──
+# Langages, frameworks, plateformes, bibliothèques, logiciels.
 TOOLS_TAXONOMY: set[str] = {
-    # Gestion de version / Collaboration code
-    "git", "github", "gitlab", "bitbucket", "svn",
-    # Éditeurs / IDEs
-    "vs code", "vscode", "intellij", "pycharm", "eclipse", "netbeans",
-    "android studio", "xcode", "sublime text", "vim", "neovim",
+    # Langages de programmation
+    "python", "java", "javascript", "typescript", "c", "c++", "c#",
+    "go", "rust", "ruby", "php", "swift", "kotlin", "scala",
+    "r", "matlab", "bash", "powershell", "sql", "nosql",
+    # Bases de données
+    "mongodb", "postgresql", "mysql", "oracle", "sqlite",
+    "redis", "elasticsearch", "neo4j", "cassandra", "snowflake",
+    "mariadb", "dynamodb", "firebase",
+    # Frontend
+    "react", "angular", "vue", "vue.js", "next.js", "nuxt.js", "svelte",
+    "html", "css", "sass", "tailwind", "bootstrap", "jquery",
+    # Backend / Frameworks
+    "node.js", "express", "fastapi", "django", "flask",
+    "spring", "spring boot", "laravel", "asp.net", ".net",
+    "rails", "symfony", "nestjs", "strapi",
     # DevOps / Conteneurs
-    "docker", "kubernetes", "k8s", "jenkins", "gitlab ci", "github actions",
-    "terraform", "ansible", "helm", "vagrant",
-    # Cloud (plateformes)
-    "aws", "azure", "gcp", "google cloud", "heroku", "vercel", "netlify",
-    "digitalocean", "render", "railway",
+    "docker", "kubernetes", "k8s", "terraform", "ansible",
+    "jenkins", "gitlab ci", "github actions", "helm", "vagrant", "nginx",
+    # Gestion de version
+    "git", "github", "gitlab", "bitbucket", "svn",
+    # Cloud
+    "aws", "azure", "gcp", "google cloud", "heroku", "vercel",
+    "netlify", "digitalocean", "render", "railway",
+    # Systèmes
+    "linux", "ubuntu", "centos", "windows server",
+    # Data / ML / IA — bibliothèques & plateformes
+    "tensorflow", "pytorch", "keras", "scikit-learn", "scikit learn",
+    "pandas", "numpy", "scipy", "matplotlib", "seaborn", "plotly",
+    "xgboost", "lightgbm", "hugging face", "transformers",
+    "langchain", "openai", "gemini", "mistral", "ollama",
+    "spark", "pyspark", "hadoop", "hive",
+    "airflow", "apache airflow", "prefect", "luigi",
+    "kafka", "apache kafka", "rabbitmq",
+    "mlflow", "wandb", "dvc",
+    # BI / Visualisation
+    "power bi", "tableau", "grafana", "kibana", "metabase",
+    "looker", "google analytics",
+    # IDE / Éditeurs
+    "vs code", "vscode", "intellij", "pycharm", "eclipse",
+    "jupyter", "google colab",
     # Gestion de projet
     "jira", "trello", "confluence", "notion", "asana", "monday",
-    "clickup", "linear",
     # Design / UI-UX
-    "figma", "adobe xd", "sketch", "invision", "zeplin",
-    "photoshop", "illustrator", "canva",
+    "figma", "adobe xd", "photoshop", "illustrator", "canva",
     # API / Tests
     "postman", "insomnia", "swagger", "openapi",
     "selenium", "cypress", "jest", "pytest", "junit",
-    # Bases de données (clients)
-    "pgadmin", "dbeaver", "mongodb compass", "tableplus", "datagrip",
-    # BI / Visualisation
-    "power bi", "tableau", "grafana", "kibana", "metabase",
-    "google analytics", "looker",
     # Monitoring / Logs
-    "prometheus", "datadog", "new relic", "sentry", "elasticsearch",
-    "logstash", "splunk",
-    # Messaging / Communication
-    "kafka", "rabbitmq", "redis",
+    "prometheus", "datadog", "sentry", "sonarqube",
+    "elasticsearch", "logstash", "splunk",
+    # Sécurité
+    "oauth", "jwt", "ssl", "tls",
+    # Build / Packaging
+    "gradle", "maven", "npm", "yarn", "pip", "conda", "poetry",
     # Office / Bureautique
-    "excel", "word", "powerpoint", "google sheets", "google docs",
-    "microsoft teams", "slack", "zoom",
-    # CMS / ERP
-    "wordpress", "drupal", "odoo", "sap", "salesforce", "hubspot",
+    "excel", "word", "powerpoint", "google sheets",
+    "microsoft teams", "slack",
+    # ERP / CRM
+    "sap", "odoo", "salesforce", "hubspot",
+    # Blockchain / Web3
+    "solidity",
     # Autres
-    "nginx", "apache", "linux", "ubuntu", "centos",
-    "sonarqube", "gradle", "maven", "npm", "yarn", "pip", "conda",
+    "wordpress", "unity", "unreal engine",
 }
 
-# ── Normalisation synonymes skills ──────────────────────────
+# ── Normalisation synonymes ──────────────────────────────────
 SKILL_ALIASES: dict[str, str] = {
+    # Langages
     "js": "JavaScript", "ts": "TypeScript",
-    "py": "Python", "postgres": "PostgreSQL",
-    "mongo": "MongoDB", "k8s": "Kubernetes",
-    "tf": "Terraform", "react.js": "React",
-    "reactjs": "React", "angularjs": "Angular",
-    "vuejs": "Vue.js", "nextjs": "Next.js",
-    "expressjs": "Express", "node": "Node.js",
-    "nodejs": "Node.js", "problem-solving": "Problem solving",
+    "py": "Python", "cpp": "C++", "csharp": "C#",
+    # Bases de données
+    "postgres": "PostgreSQL", "mongo": "MongoDB",
+    "elastic": "Elasticsearch",
+    # Frameworks / outils
+    "k8s": "Kubernetes", "tf": "Terraform",
+    "react.js": "React", "reactjs": "React",
+    "angularjs": "Angular", "vuejs": "Vue.js",
+    "nextjs": "Next.js", "expressjs": "Express",
+    "node": "Node.js", "nodejs": "Node.js",
+    "sklearn": "scikit-learn", "sk-learn": "scikit-learn",
+    "hf": "Hugging Face", "gpt": "OpenAI",
+    "langchain": "LangChain",
+    # Cloud
+    "gcp": "GCP", "google cloud platform": "GCP",
+    # Soft skills
+    "problem-solving": "Problem solving",
     "problem solving": "Problem solving",
+    # Compétences FR ↔ EN (canonicalisation)
+    "analyse de données": "Data Analysis",
+    "analyse des données": "Data Analysis",
+    "visualisation de données": "Data Visualization",
+    "visualisation des données": "Data Visualization",
+    "préparation des données": "Data Preprocessing",
+    "ia générative": "Generative AI",
+    "traitement du langage naturel": "NLP",
+    "traitement automatique du langage": "NLP",
+    "vision par ordinateur": "Computer Vision",
+    "modélisation prédictive": "Predictive Modeling",
+    "développement backend": "Backend Development",
+    "développement frontend": "Frontend Development",
+    "développement web": "Web Development",
+    "développement mobile": "Mobile Development",
+    "architecture logicielle": "Software Architecture",
+    "conception api": "API Design",
+    "conception d'api": "API Design",
+    "gestion de projet": "Project Management",
+    "intégration continue": "CI/CD",
+    "conteneurisation": "Containerization",
+    "déploiement cloud": "Cloud Deployment",
+    "architecture cloud": "Cloud Architecture",
+    "sécurité informatique": "Cybersecurity",
 }
