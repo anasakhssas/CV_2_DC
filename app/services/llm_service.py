@@ -180,3 +180,30 @@ RÈGLE ABSOLUE: ne jamais traduire, paraphraser ou compléter les champs degree/
         ]
     }
     return extract_structured(text_to_analyze, instruction, schema, temperature=0.01)
+
+
+def enhance_soft_skills(cv_text: str) -> dict | None:
+    """Utilise le LLM pour extraire les soft skills depuis le CV."""
+    instruction = """Analyse ce CV et extrais UNIQUEMENT les soft skills (compétences comportementales / interpersonnelles).
+
+DÉFINITION soft skill : qualité humaine, comportementale ou organisationnelle.
+Exemples : communication, leadership, travail en équipe, rigueur, adaptabilité, autonomie,
+curiosité, esprit d'initiative, gestion du stress, créativité, sens des responsabilités…
+
+RÈGLES STRICTES :
+- N'inclure AUCUN langage de programmation, framework, outil technique, ni domaine technique (Python, Docker, ML, etc.)
+- N'inclure AUCUN hard skill métier (machine learning, DevOps, data science, etc.)
+- Extraire SEULEMENT ce qui est EXPLICITEMENT présent dans le texte du CV (section soft skills, profil, résumé, etc.)
+- Si aucun soft skill n'est trouvé, retourner {"soft_skills": []}
+- Retourner AU MAXIMUM 5 soft skills
+- Pour chaque soft skill, indiquer le texte source exact (evidence)"""
+
+    schema = {
+        "soft_skills": [
+            {
+                "name": "string — nom normalisé du soft skill en français",
+                "evidence": "string — citation exacte du CV",
+            }
+        ]
+    }
+    return extract_structured(cv_text, instruction, schema, temperature=0.1)

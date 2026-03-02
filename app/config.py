@@ -142,26 +142,55 @@ HARD_SKILLS_TAXONOMY: set[str] = {
 }
 
 SOFT_SKILLS_TAXONOMY: set[str] = {
-    "communication", "leadership", "teamwork", "problem solving",
-    "problem-solving", "critical thinking", "adaptability", "adaptabilité",
-    "time management", "gestion du temps", "creativity", "créativité",
-    "collaboration", "decision making", "prise de décision",
-    "conflict resolution", "gestion des conflits",
-    "emotional intelligence", "intelligence émotionnelle",
-    "negotiation", "négociation", "presentation", "présentation",
-    "mentoring", "coaching", "empathy", "empathie",
-    "flexibility", "flexibilité", "initiative",
-    "attention to detail", "souci du détail",
+    # ── Communication ──────────────────────────────────────
+    "communication", "communication skills", "compétences en communication",
+    "written communication", "verbal communication",
+    "presentation", "présentation", "public speaking", "prise de parole en public",
+    # ── Leadership & management ────────────────────────────
+    "leadership", "team leadership", "lead", "leading",
+    "mentoring", "coaching", "management",
+    "decision making", "prise de décision",
+    # ── Travail en équipe ──────────────────────────────────
+    "teamwork", "team player", "travail en équipe", "esprit d'équipe",
+    "esprit équipe", "collaboration", "collaborative",
+    "interpersonal skills", "compétences interpersonnelles",
+    # ── Résolution de problèmes ────────────────────────────
+    "problem solving", "problem-solving", "résolution de problèmes",
+    "critical thinking", "pensée critique", "analytical thinking", "pensée analytique",
+    "analytical skills", "esprit analytique", "esprit d'analyse",
+    # ── Adaptabilité ──────────────────────────────────────
+    "adaptability", "adaptabilité", "flexibility", "flexibilité",
+    "versatility", "polyvalence", "polyvalent",
+    "resilience", "résilience",
+    # ── Organisation & rigueur ─────────────────────────────
+    "time management", "gestion du temps",
+    "organization", "organisation", "organised", "organisé",
+    "attention to detail", "souci du détail", "rigueur", "rigoureux",
     "work ethic", "éthique de travail",
     "stress management", "gestion du stress",
-    "analytical thinking", "pensée analytique",
-    "organization", "organisation",
-    "autonomy", "autonomie",
-    "curiosity", "curiosité",
-    "proactivity", "proactivité",
-    "motivation", "perseverance", "persévérance",
-    "interpersonal skills", "compétences interpersonnelles",
-    "public speaking", "prise de parole en public",
+    # ── Autonomie & initiative ─────────────────────────────
+    "autonomy", "autonomie", "autonomous", "autonome",
+    "initiative", "proactivity", "proactivité", "proactive",
+    "self-motivated", "self motivated",
+    # ── Créativité & innovation ────────────────────────────
+    "creativity", "créativité", "creative", "créatif",
+    "innovation", "innovative", "innovant",
+    # ── Qualités personnelles ──────────────────────────────
+    "curiosity", "curiosité", "curious",
+    "motivation", "motivated", "motivé",
+    "perseverance", "persévérance", "determination", "détermination",
+    "empathy", "empathie",
+    "conflict resolution", "gestion des conflits",
+    "negotiation", "négociation",
+    "emotional intelligence", "intelligence émotionnelle",
+    # ── Sens des responsabilités ───────────────────────────
+    "responsibility", "responsabilité", "sens des responsabilités",
+    "accountability", "reliability", "fiabilité",
+    # ── Autres ────────────────────────────────────────────
+    "fast learner", "quick learner", "apprentissage rapide",
+    "continuous learning", "veille technologique",
+    "open-minded", "ouverture d'esprit",
+    "multitasking", "gestion des priorités",
 }
 
 # ── Taxonomie Outils / Technologies (ce que l'on UTILISE) ──

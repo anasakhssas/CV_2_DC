@@ -213,6 +213,30 @@ async def extract_full(file: UploadFile = File(...)):
                     last_degree = determine_last_degree(educations)
                     logger.info("✅ %d formation(s) extraites via LLM", len(educations))
 
+            # Enrichissement soft skills
+            llm_ss = llm_service.enhance_soft_skills(text)
+            if llm_ss and llm_ss.get("soft_skills"):
+                from app.models import Skill as SkillModel
+                llm_soft: list = []
+                for s in llm_ss["soft_skills"]:
+                    name = (s.get("name") or "").strip()
+                    if not name:
+                        continue
+                    try:
+                        llm_soft.append(SkillModel(
+                            name=name,
+                            level=3,
+                            category="soft",
+                            score=5.0,
+                            evidence=[s.get("evidence", "")[:200]],
+                            confidence=0.85,
+                        ))
+                    except Exception as llm_e:
+                        logger.warning("Soft skill LLM invalide ignoré: %s", llm_e)
+                if llm_soft:
+                    soft_skills = llm_soft[:5]
+                    logger.info("✅ %d soft skill(s) extraits via LLM", len(soft_skills))
+
             # Enrichissement expériences
             llm_exp = llm_service.enhance_experiences(text)
             if llm_exp and llm_exp.get("experiences"):
@@ -394,8 +418,32 @@ async def extract_skills_only(file: UploadFile = File(...)):
     pdf_content = extract_pdf(pdf_path)
     text = clean_text(pdf_content.text)
     hard_skills, soft_skills = extract_skills(text)
-    top_tools = extract_top_tools(text)
-    return {"hard_skills": hard_skills, "soft_skills": soft_skills, "top_tools": top_tools}
+
+    # LLM enhancement pour soft skills
+    if llm_service.is_available():
+        llm_ss = llm_service.enhance_soft_skills(text)
+        if llm_ss and llm_ss.get("soft_skills"):
+            from app.models import Skill as SkillModel
+            llm_soft = []
+            for s in llm_ss["soft_skills"]:
+                name = (s.get("name") or "").strip()
+                if not name:
+                    continue
+                try:
+                    llm_soft.append(SkillModel(
+                        name=name,
+                        level=3,
+                        category="soft",
+                        score=5.0,
+                        evidence=[s.get("evidence", "")[:200]],
+                        confidence=0.85,
+                    ))
+                except Exception:
+                    pass
+            if llm_soft:
+                soft_skills = llm_soft[:5]
+
+    return {"hard_skills": hard_skills, "soft_skills": soft_skills}
 
 
 @app.post("/extract/tools")
