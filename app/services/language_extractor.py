@@ -113,10 +113,10 @@ def _detect_level(context: str) -> tuple[float, str, float]:
     return 0, "Inconnu", 0.3
 
 
-def extract_languages(text: str) -> list[Language]:
-    """Extrait les langues avec normalisation du niveau /5.
+def extract_languages(text: str) -> list[str]:
+    """Extrait les langues depuis le CV.
 
-    Retourne le Top 3 langues triées par niveau décroissant.
+    Retourne le Top 3 noms de langues triés par niveau décroissant.
     """
     # Chercher section dédiée d'abord
     section = _find_language_section(text)
@@ -164,4 +164,4 @@ def extract_languages(text: str) -> list[Language]:
 
     # Trier par niveau décroissant, garder Top 3
     languages = sorted(found_languages.values(), key=lambda l: l.level, reverse=True)
-    return languages[:3]
+    return [l.name for l in languages[:3]]

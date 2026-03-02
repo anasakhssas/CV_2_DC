@@ -245,8 +245,6 @@ async def extract_full(file: UploadFile = File(...)):
             confidences.append(e.confidence)
         for e in experiences:
             confidences.append(e.confidence)
-        for l in languages:
-            confidences.append(l.confidence)
         overall = round(sum(confidences) / len(confidences), 2) if confidences else 0.5
 
         # ── Construire le dossier ────────────────────────

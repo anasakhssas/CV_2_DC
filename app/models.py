@@ -101,7 +101,7 @@ class DossierCompetences(BaseModel):
     experiences: list[Experience] = Field(default_factory=list)
 
     # Langues (top 3)
-    languages: list[Language] = Field(default_factory=list)
+    languages: list[str] = Field(default_factory=list)
 
     # Compétences
     hard_skills: list[Skill] = Field(default_factory=list, description="Top 5 hard skills")
