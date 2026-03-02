@@ -28,10 +28,14 @@ _SECTION_WORDS = re.compile(
 # Titres de postes fréquents (à ne pas confondre avec un nom)
 _JOB_TITLE_WORDS = re.compile(
     r"(?i)\b("
-    r"engineer|developer|developer|ingénieur|développeur|developpeur|"
-    r"manager|analyst|consultant|architect|designer|director|"
-    r"stagiaire|intern|chef|lead|senior|junior|fullstack|frontend|backend|"
-    r"data\s*scientist|devops|technicien|responsable"
+    r"engineer|engineering|developer|développeur|developpeur|ingénieur|ingenieur|"
+    r"manager|analyst|consultant|architect|designer|director|officer|"
+    r"stagiaire|intern|student|étudiant|etudiant|apprenti|"
+    r"chef|lead|senior|junior|fullstack|frontend|backend|"
+    r"data\s*scientist|data\s*engineer|devops|technicien|responsable|"
+    r"researcher|researcher|scientist|specialist|spécialiste|"
+    r"artificial\s*intelligence|machine\s*learning|software|hardware|"
+    r"master|bachelor|licence|doctorat|phd|graduate|undergraduate"
     r")\b"
 )
 
@@ -86,21 +90,51 @@ def _normalize_name(name: str) -> str:
     return name.strip()
 
 
-def extract_candidate_name(text: str) -> tuple[str | None, float]:
+def extract_candidate_name(text: str, pdf_path: str | None = None) -> tuple[str | None, float]:
     """Extrait le nom du candidat depuis le texte du CV.
 
-    Stratégie :
-    - Analyser les 20 premières lignes non vides (le nom est presque toujours en haut)
-    - Filtrer les lignes qui ne sont pas un nom (email, tél, URL, section, poste)
-    - Valider via pattern nom (2–4 mots capitalisés)
+    Stratégie (par ordre de priorité) :
+    1. Plus grande police dans le PDF (si pdf_path fourni) — confiance 0.98
+    2. LLM (si disponible) — prompt avec exemples
+    3. Fallback regex — analyse les 20 premières lignes
 
     Returns:
         (nom, confidence)
     """
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    # ── 1) Plus grande police ────────────────────────────────
+    if pdf_path:
+        try:
+            from app.services.pdf_extractor import get_largest_font_lines
+            largest_lines = get_largest_font_lines(pdf_path, page_num=0)
+            for line in largest_lines:
+                if _is_valid_name_line(line):
+                    name = _normalize_name(line)
+                    logger.info("Nom détecté via police (plus grand): %s", name)
+                    return name, 0.98
+            if largest_lines:
+                logger.info("Plus grande police trouvée mais pas un nom valide: %s", largest_lines)
+        except Exception as e:
+            logger.warning("Erreur détection police: %s", e)
 
-    # Analyser les 20 premières lignes
-    candidates: list[tuple[int, str]] = []  # (position, ligne)
+    # ── 2) LLM ──────────────────────────────────────────────
+    try:
+        from app.services import llm_service
+        if llm_service.is_available():
+            result = llm_service.extract_name(text)
+            if result:
+                name = (result.get("candidate_name") or "").strip()
+                confidence = float(result.get("confidence") or 0.0)
+                if name and confidence > 0.5:
+                    name = _normalize_name(name)
+                    logger.info("Nom extrait via LLM: %s (confiance %.2f)", name, confidence)
+                    return name, confidence
+            logger.warning("LLM n'a pas trouvé de nom — fallback regex")
+    except Exception as e:
+        logger.warning("Erreur LLM pour extraction nom: %s — fallback regex", e)
+
+    # ── 3) Fallback regex ────────────────────────────────────
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    candidates: list[tuple[int, str]] = []
 
     for i, line in enumerate(lines[:20]):
         if _is_valid_name_line(line):
@@ -110,12 +144,9 @@ def extract_candidate_name(text: str) -> tuple[str | None, float]:
         logger.info("Nom candidat non trouvé dans les 20 premières lignes")
         return None, 0.0
 
-    # Prendre le candidat le plus proche du début
     best_pos, best_line = candidates[0]
     name = _normalize_name(best_line)
 
-    # Confiance : plus c'est en haut, plus c'est fiable
     confidence = 0.95 if best_pos <= 3 else (0.80 if best_pos <= 7 else 0.65)
-
-    logger.info("Nom détecté: %s (ligne %d, confiance %.2f)", name, best_pos, confidence)
+    logger.info("Nom détecté (regex): %s (ligne %d, confiance %.2f)", name, best_pos, confidence)
     return name, confidence

@@ -25,6 +25,7 @@ from app.services.skills_extractor import extract_skills, extract_top_tools
 from app.services.language_extractor import extract_languages
 from app.services.name_extractor import extract_candidate_name
 from app.services import llm_service
+from app.services.docx_generator import generate_dossier_docx
 
 # ── Logging ─────────────────────────────────────────────────
 logging.basicConfig(
@@ -57,6 +58,83 @@ app.mount("/output", StaticFiles(directory=str(OUTPUT_DIR)), name="output")
 
 
 # ─────────────────────────────────────────────────────────────
+#  HELPERS
+# ─────────────────────────────────────────────────────────────
+
+import re as _re
+from app.models import Education as EduModel
+
+# Mots-clés techniques qui ne doivent pas apparaître dans un diplôme ou une école
+_TECH_KEYWORDS = _re.compile(
+    r"(?i)\b(python|java|javascript|sql|fastapi|spring|react|docker|kubernetes|"
+    r"postgresql|mongodb|mysql|git|aws|azure|gcp|tensorflow|pytorch|langchain|"
+    r"hugging\s*face|mlflow|ci/cd|rest\s*api|graphql|snowflake|ml|dl|nlp|"
+    r"llm|computer\s*vision|machine\s*learning|deep\s*learning|containerization|"
+    r"model\s*deployment|spring\s*boot)\b"
+)
+
+def _is_valid_education(e: dict) -> bool:
+    """Valide qu'une entrée LLM est bien un diplôme et non du contenu parasite."""
+    degree = (e.get("degree") or "").strip()
+    school = (e.get("school") or "").strip()
+
+    # Degree trop long → probablement du contenu mélangé
+    if len(degree.split()) > 12:
+        logger.warning("Education rejetée (degree trop long: %d mots): %s", len(degree.split()), degree[:80])
+        return False
+
+    # Degree contient des mots-clés techniques
+    if _TECH_KEYWORDS.search(degree):
+        logger.warning("Education rejetée (mots-clés techniques dans degree): %s", degree[:80])
+        return False
+
+    # School contient des mots-clés techniques
+    if school and _TECH_KEYWORDS.search(school):
+        logger.warning("Education rejetée (mots-clés techniques dans school): %s", school[:80])
+        return False
+
+    # Degree vide
+    if not degree:
+        return False
+
+    return True
+
+
+def _build_educations(text: str) -> list[EduModel]:
+    """LLM en priorité → regex en fallback."""
+    # 1) Essai LLM
+    if llm_service.is_available():
+        edu_section = find_education_section(text)
+        llm_edu = llm_service.enhance_education(text, section_text=edu_section or None)
+        if llm_edu and llm_edu.get("educations"):
+            llm_educations = []
+            for e in llm_edu["educations"]:
+                if not _is_valid_education(e):
+                    continue
+                try:
+                    llm_educations.append(EduModel(
+                        year=e.get("year"),
+                        degree=e.get("degree", ""),
+                        school=e.get("school"),
+                        degree_level=e.get("degree_level"),
+                        status=e.get("status", "obtained"),
+                        evidence=e.get("evidence", "")[:500],
+                        confidence=0.9,
+                    ))
+                except Exception as llm_e:
+                    logger.warning("Formation LLM invalide ignorée: %s | data=%s", llm_e, e)
+            if llm_educations:
+                logger.info("✅ %d formation(s) extraites via LLM", len(llm_educations))
+                return llm_educations
+        logger.warning("LLM disponible mais n'a pas retourné de formations valides — fallback regex")
+
+    # 2) Fallback regex
+    educations = extract_educations(text)
+    logger.info("Regex: %d formation(s) trouvées", len(educations))
+    return educations
+
+
+# ─────────────────────────────────────────────────────────────
 #  ROUTES
 # ─────────────────────────────────────────────────────────────
 
@@ -74,6 +152,8 @@ def root():
             "POST /extract/skills": "Extraction compétences uniquement",
             "POST /extract/tools": "Top 5 outils maîtrisés",
             "POST /extract/languages": "Extraction langues uniquement",
+            "POST /extract/name": "Extraction nom du candidat uniquement",
+            "GET /download/{cv_stem}": "Télécharger le dossier de compétences .docx",
             "GET /health": "Vérification santé",
         },
     }
@@ -133,7 +213,7 @@ async def extract_full(file: UploadFile = File(...)):
         logger.info("✅ Texte extrait: %d caractères, %d images", len(text), len(pdf_content.images))
 
         # ── 0. Nom du candidat ──────────────────────────────
-        candidate_name, name_confidence = extract_candidate_name(text)
+        candidate_name, name_confidence = extract_candidate_name(text, pdf_path=str(pdf_path))
         if not candidate_name:
             missing_info.append("Nom du candidat non détecté")
 
@@ -154,7 +234,7 @@ async def extract_full(file: UploadFile = File(...)):
             missing_info.append("Erreur extraction photo")
 
         # ── 3. Formations ────────────────────────────────
-        educations = extract_educations(text)
+        educations = _build_educations(text)
         if not educations:
             missing_info.append("Aucune formation détectée")
 
@@ -188,30 +268,6 @@ async def extract_full(file: UploadFile = File(...)):
         # ── LLM Enhancement (optionnel) ──────────────────
         if llm_service.is_available():
             logger.info("🤖 Enrichissement LLM activé")
-
-            # Enrichissement formations
-            edu_section = find_education_section(text)
-            llm_edu = llm_service.enhance_education(text, section_text=edu_section or None)
-            if llm_edu and llm_edu.get("educations"):
-                from app.models import Education as EduModel
-                llm_educations = []
-                for e in llm_edu["educations"]:
-                    try:
-                        llm_educations.append(EduModel(
-                            year=e.get("year"),
-                            degree=e.get("degree", ""),
-                            school=e.get("school"),
-                            degree_level=e.get("degree_level"),
-                            status=e.get("status", "obtained"),
-                            evidence=e.get("evidence", "")[:500],
-                            confidence=0.9,
-                        ))
-                    except Exception as llm_e:
-                        logger.warning("Formation LLM invalide ignorée: %s", llm_e)
-                if llm_educations:
-                    educations = llm_educations
-                    last_degree = determine_last_degree(educations)
-                    logger.info("✅ %d formation(s) extraites via LLM", len(educations))
 
             # Enrichissement soft skills
             llm_ss = llm_service.enhance_soft_skills(text)
@@ -293,8 +349,15 @@ async def extract_full(file: UploadFile = File(...)):
         output_json = cv_output_dir / "dossier_competences.json"
         with open(output_json, "w", encoding="utf-8") as f:
             f.write(dossier.model_dump_json(indent=2))
+        logger.info("✅ JSON généré: %s", output_json)
 
-        logger.info("✅ Dossier de compétences généré: %s", output_json)
+        # Générer le fichier Word (.docx)
+        try:
+            docx_path = generate_dossier_docx(dossier, cv_output_dir)
+            logger.info("✅ DOCX généré: %s", docx_path)
+        except Exception as docx_err:
+            logger.warning("Génération DOCX échouée (JSON toujours disponible): %s", docx_err)
+
         return dossier
 
     except HTTPException:
@@ -325,35 +388,7 @@ async def extract_education_only(file: UploadFile = File(...)):
     pdf_path = await _save_upload(file)
     pdf_content = extract_pdf(pdf_path)
     text = clean_text(pdf_content.text)
-    educations = extract_educations(text)
-
-    if llm_service.is_available():
-        edu_section = find_education_section(text)
-        logger.info("Education section found: %d chars", len(edu_section))
-        llm_edu = llm_service.enhance_education(text, section_text=edu_section or None)
-        logger.info("LLM education result keys: %s", list(llm_edu.keys()) if llm_edu else "None")
-        if llm_edu and llm_edu.get("educations"):
-            from app.models import Education as EduModel
-            llm_educations = []
-            for e in llm_edu["educations"]:
-                try:
-                    llm_educations.append(EduModel(
-                        year=e.get("year"),
-                        degree=e.get("degree", ""),
-                        school=e.get("school"),
-                        degree_level=e.get("degree_level"),
-                        status=e.get("status", "obtained"),
-                        evidence=e.get("evidence", "")[:500],
-                        confidence=0.9,
-                    ))
-                except Exception as llm_e:
-                    logger.warning("Formation LLM invalide ignorée: %s | data=%s", llm_e, e)
-            if llm_educations:
-                educations = llm_educations
-                logger.info("✅ %d formation(s) LLM utilisées", len(educations))
-            else:
-                logger.warning("LLM returned educations list but none passed validation")
-
+    educations = _build_educations(text)
     last_degree = determine_last_degree(educations)
     return {"educations": educations, "last_degree": last_degree}
 
@@ -466,6 +501,19 @@ async def extract_languages_only(file: UploadFile = File(...)):
     return {"languages": languages}
 
 
+@app.post("/extract/name")
+async def extract_name_only(file: UploadFile = File(...)):
+    """Extraction du nom et prénom du candidat uniquement."""
+    pdf_path = await _save_upload(file)
+    pdf_content = extract_pdf(pdf_path)
+    text = clean_text(pdf_content.text)
+    name, confidence = extract_candidate_name(text, pdf_path=str(pdf_path))
+    return {
+        "candidate_name": name,
+        "confidence": round(confidence, 2),
+    }
+
+
 # ─────────────────────────────────────────────────────────────
 #  HELPERS
 # ─────────────────────────────────────────────────────────────
@@ -478,3 +526,38 @@ async def _save_upload(file: UploadFile) -> Path:
     with open(pdf_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
     return pdf_path
+
+
+# ─────────────────────────────────────────────────────────────
+#  TÉLÉCHARGEMENT DU DOSSIER .DOCX
+# ─────────────────────────────────────────────────────────────
+
+@app.get("/download/{cv_stem}")
+def download_dossier(cv_stem: str):
+    """
+    Télécharge le dossier de compétences Word (.docx) pour un CV donné.
+
+    Args:
+        cv_stem: Nom du fichier CV sans extension (ex: 'cv_dupont').
+    """
+    cv_output_dir = OUTPUT_DIR / cv_stem
+    if not cv_output_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Aucun dossier trouvé pour '{cv_stem}'.")
+
+    # Cherche le premier .docx dans le répertoire
+    docx_files = list(cv_output_dir.glob("*.docx"))
+    if not docx_files:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Dossier de compétences .docx non encore généré pour '{cv_stem}'. "
+                "Lancez d'abord POST /extract."
+            ),
+        )
+
+    docx_path = docx_files[0]
+    return FileResponse(
+        path=str(docx_path),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=docx_path.name,
+    )

@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 # forward ref
 __all__ = [
     "Education", "LastDegree", "Experience",
-    "Language", "Skill", "Tool", "PhotoResult", "DossierCompetences",
+    "Language", "Skill", "Tool", "PhotoResult",
+    "DossierCompetences", "YearsOfExperience",
 ]
 
 
@@ -72,6 +73,16 @@ class Tool(BaseModel):
     level: int = Field(..., ge=1, le=5, description="Niveau de maîtrise /5")
     score: float = Field(0, description="Score interne de classement")
     evidence: list[str] = Field(default_factory=list)
+    confidence: float = Field(1.0, ge=0, le=1)
+
+
+# ── Années d'expérience ─────────────────────────────────────
+class YearsOfExperience(BaseModel):
+    total_months: int = 0
+    total_years: float = 0.0
+    total_years_excluding_internships: float = 0.0
+    intervals: list[dict] = Field(default_factory=list)
+    missing_dates: list[str] = Field(default_factory=list)
     confidence: float = Field(1.0, ge=0, le=1)
 
 

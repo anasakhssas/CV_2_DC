@@ -145,33 +145,41 @@ def enhance_education(cv_text: str, section_text: str | None = None) -> dict | N
     logger.info("enhance_education: section_text=%d chars, using %d chars",
                 len(section_text) if section_text else 0, len(text_to_analyze))
 
-    instruction = f"""Tu reçois le texte brut de la section FORMATIONS d'un CV. Année actuelle: {current_year}.
-Extrais UNIQUEMENT les diplômes académiques officiels (exclure certifications, MOOCs, workshops).
+    instruction = f"""Tu reçois le texte brut d'un CV. Année actuelle: {current_year}.
+Extrais UNIQUEMENT les diplômes académiques officiels obtenus dans un établissement scolaire ou universitaire.
 
-Pour CHAQUE formation, remplis ces champs:
-  year        → année de FIN uniquement (entier). Si période "A - B" prends B. Si "en cours" prends année prévue.
-  degree      → copie EXACTEMENT le nom du diplôme tel qu'il apparaît dans le texte. Zéro modification.
-  school      → copie EXACTEMENT le nom de l'établissement tel qu'il apparaît dans le texte. Zéro modification.
-  degree_level→ déduis strictement: Baccalauréat/Bac→"Bac", DUT/BTS→"Bac+2", Licence/Bachelor/BSc→"Bac+3", Master/MSc/MBA/Ingénieur/Cycle ingénieur→"Bac+5", Doctorat/PhD→"Bac+8", sinon null.
-  status      → "en_cours" si year >= {current_year} ou texte indique en cours/actuel/présent, sinon "obtained".
-  evidence    → la ligne exacte du texte source.
+CRITÈRES STRICTS pour qu'une entrée soit considérée comme un diplôme :
+- Doit mentionner un type de diplôme reconnu : Baccalauréat, Licence, Bachelor, DUT, BTS, Master, MBA, MSc, Ingénieur, Cycle Ingénieur, Doctorat, PhD
+- Doit mentionner un établissement scolaire ou universitaire (lycée, université, école, faculté, institut...)
+- EXCLURE absolument : certifications, MOOCs, workshops, formations courtes, cours en ligne (Coursera, Udemy...), compétences techniques, outils, langages de programmation
 
-EXEMPLE:
-Texte: "ENSAM Rabat | Cycle Ingénieur | 2022 - 2025"
-Résultat:
-  year=2025, degree="Cycle Ingénieur", school="ENSAM Rabat", degree_level="Bac+5", status="obtained", evidence="ENSAM Rabat | Cycle Ingénieur | 2022 - 2025"
+UN DIPLÔME = au maximum 10 mots pour le champ "degree". Si degree dépasse 10 mots, c'est sûrement une erreur.
 
-Texte: "Lycée Ibn Sina | Baccalauréat Sciences Physiques | 2021"
-Résultat:
-  year=2021, degree="Baccalauréat Sciences Physiques", school="Lycée Ibn Sina", degree_level="Bac", status="obtained", evidence="Lycée Ibn Sina | Baccalauréat Sciences Physiques | 2021"
+Pour CHAQUE diplôme trouvé :
+  year        → année de FIN uniquement (entier ou null si absent).
+  degree      → NOM COURT du diplôme uniquement (ex: "Cycle Ingénieur", "Bachelor of Science in Physics", "Baccalauréat Sciences Physiques"). JAMAIS plus de 10 mots.
+  school      → nom de l'établissement uniquement (ex: "Faculté Polydisciplinaire Taza", "ENSAM Rabat"). JAMAIS une liste de technologies.
+  degree_level→ "Bac" | "Bac+2" | "Bac+3" | "Bac+5" | "Bac+8" | null
+  status      → "en_cours" si year >= {current_year} ou texte indique en cours, sinon "obtained"
+  evidence    → ligne exacte du texte source (courte, max 100 caractères)
 
-RÈGLE ABSOLUE: ne jamais traduire, paraphraser ou compléter les champs degree/school. Copie mot pour mot."""
+EXEMPLES CORRECTS :
+  degree="Cycle Ingénieur", school="ENSAM Rabat", year=2025
+  degree="Bachelor of Science in Physics", school="Faculté Polydisciplinaire Taza", year=2023
+  degree="Baccalauréat Sciences Physiques", school="Lycée Tahla", year=2019
+
+EXEMPLES INCORRECTS (à ne PAS extraire) :
+  ❌ degree contenant "Python, Java, FastAPI..." → c'est une compétence, pas un diplôme
+  ❌ school contenant "Spring Boot, React..." → c'est une technologie, pas une école
+  ❌ degree avec plus de 10 mots → probablement une erreur de découpage
+
+Si aucun diplôme clairement identifiable → retourner {{"educations": []}}"""
 
     schema = {
         "educations": [
             {
                 "year": "int|null",
-                "degree": "string",
+                "degree": "string (max 10 mots)",
                 "school": "string|null",
                 "degree_level": "string|null",
                 "status": "string",
@@ -207,3 +215,40 @@ RÈGLES STRICTES :
         ]
     }
     return extract_structured(cv_text, instruction, schema, temperature=0.1)
+
+
+def extract_name(cv_text: str) -> dict | None:
+    """Utilise le LLM pour extraire le nom complet du candidat."""
+    # On envoie seulement les 30 premières lignes — le nom est toujours en haut
+    first_lines = "\n".join(cv_text.splitlines()[:30])
+
+    instruction = """Tu dois extraire le NOM COMPLET (prénom + nom) du candidat depuis les premières lignes de ce CV.
+
+RÈGLES :
+- Le nom est généralement la première ou deuxième ligne non vide du CV
+- Un nom = 2 à 4 mots composés de lettres uniquement (pas de chiffres, pas de symboles)
+- Ce N'EST PAS un nom : un titre de poste, une phrase de profil, un intitulé de section
+
+EXEMPLES DE NOMS CORRECTS :
+  ✅ "Mohammed Rachid Batal"
+  ✅ "Sarah El Amrani"
+  ✅ "Jean-Pierre Dupont"
+  ✅ "FATIMA ZAHRA BENALI"
+  ✅ "Youssef Ait Taleb"
+  ✅ "Alice Martin"
+
+EXEMPLES DE CE QUI N'EST PAS UN NOM :
+  ❌ "Engineering Student" → titre de profil
+  ❌ "Data Science & AI Engineering" → description de domaine
+  ❌ "Curriculum Vitae" → titre de document
+  ❌ "Full Stack Developer" → titre de poste
+  ❌ "Contact : +212 6..." → coordonnées
+
+Si tu trouves le nom → retourne {"candidate_name": "Prénom Nom", "confidence": 0.95}
+Si tu n'es pas sûr → retourne {"candidate_name": null, "confidence": 0.0}"""
+
+    schema = {
+        "candidate_name": "string|null",
+        "confidence": "float entre 0 et 1",
+    }
+    return extract_structured(first_lines, instruction, schema, temperature=0.0)

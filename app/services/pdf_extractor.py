@@ -83,3 +83,46 @@ def render_page_as_image(pdf_path: str | Path, page_num: int = 0, dpi: int = 200
     img_bytes = pix.tobytes("png")
     doc.close()
     return img_bytes
+
+
+def get_largest_font_lines(pdf_path: str | Path, page_num: int = 0) -> list[str]:
+    """Retourne les lignes de texte ayant la plus grande taille de police sur la page.
+
+    Dans un CV, le nom du candidat est presque toujours écrit en plus grande police
+    que le reste du texte.
+
+    Returns:
+        Liste de chaînes de texte à la taille de police maximale trouvée.
+    """
+    pdf_path = Path(pdf_path)
+    doc = fitz.open(str(pdf_path))
+    if page_num >= len(doc):
+        doc.close()
+        return []
+
+    page = doc[page_num]
+    blocks = page.get_text("dict")["blocks"]
+    doc.close()
+
+    # Collecter tous les spans avec leur taille et texte
+    spans_by_size: dict[float, list[str]] = {}
+    for block in blocks:
+        for line in block.get("lines", []):
+            line_text = "".join(s["text"] for s in line.get("spans", [])).strip()
+            if not line_text:
+                continue
+            for span in line.get("spans", []):
+                size = round(span["size"], 1)
+                text = span["text"].strip()
+                if text:
+                    if size not in spans_by_size:
+                        spans_by_size[size] = []
+                    if line_text not in spans_by_size[size]:
+                        spans_by_size[size].append(line_text)
+
+    if not spans_by_size:
+        return []
+
+    max_size = max(spans_by_size.keys())
+    logger.info("Taille de police max trouvée: %.1fpt — textes: %s", max_size, spans_by_size[max_size])
+    return spans_by_size[max_size]

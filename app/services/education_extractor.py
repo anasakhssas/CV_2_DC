@@ -13,7 +13,12 @@ logger = logging.getLogger(__name__)
 _SECTION_HEADING = re.compile(
     r"(?i)(?:^|\n)[^\n]*\b("
     r"formations?|\u00e9tudes|etudes|parcours\s*acad[e\u00e9]mique|"
-    r"dipl[o\u00f4]mes?|education|academic\s*background|scolarit[e\u00e9]"
+    r"dipl[o\u00f4]mes?|education|academic\s*background|scolarit[e\u00e9]|"
+    r"cursus|background\s*acad[e\u00e9]mique|background\s*scolaire|"
+    r"qualifications?|academic\s*qualifications?|"
+    r"parcours\s*scolaire|parcours\s*universitaire|"
+    r"\u00e9tudes\s*sup[e\u00e9]rieures|formations?\s*acad[e\u00e9]miques?|"
+    r"lyc[e\u00e9]e|universit[e\u00e9]|\u00e9tablissements?|schooling"
     r")\b",
     re.MULTILINE,
 )
@@ -29,11 +34,14 @@ _NEXT_SECTION_HEADING = re.compile(
 )
 _DEGREE_KEYWORDS = re.compile(
     r"(?i)\b("
-    r"doctorat|phd|doctorate|"
-    r"master|msc|mba|ingénieur|ingenieur|"
-    r"licence|bachelor|bsc|"
-    r"dut|bts|deust|deug|"
-    r"baccalauréat|baccalaureat|bac"
+    r"doctorat|phd|doctorate|these|th\u00e8se|"
+    r"master|mastere|mast\u00e8re|msc|mba|m2|m1|"
+    r"ing[e\u00e9]nieur|cycle\s*ing[e\u00e9]nieur|\u00e9cole\s*d.ing[e\u00e9]nieur|"
+    r"licence|bachelor|bsc|ba|l3|l2|l1|"
+    r"dut|bts|deust|deug|bpro|"
+    r"baccalaur[e\u00e9]at|baccalaureat|bac|"
+    r"classes?\s*pr[e\u00e9]pa|cpge|mp|pc|psi|\u00e9conomique|scientifique|"
+    r"dipl[o\u00f4]me|degree|graduate|undergraduate|postgraduate"
     r")\b"
 )
 
@@ -153,13 +161,38 @@ def extract_educations(text: str) -> list[Education]:
     """Extrait toutes les formations depuis le texte du CV."""
     # Essayer d'abord la section dédiée
     section = _find_education_section(text)
+    logger.info("Education section found: %d chars", len(section))
 
-    # Fallback : chercher dans tout le texte
-    if not section:
-        logger.info("Section éducation non trouvée, recherche globale")
-        section = text
+    if section:
+        raw_entries = _extract_entries_from_section(section)
+        logger.info("Regex entries from section: %d", len(raw_entries))
+    else:
+        raw_entries = []
 
-    raw_entries = _extract_entries_from_section(section)
+    # Fallback 1 : chercher dans tout le texte si section non trouvée
+    if not raw_entries:
+        logger.info("Fallback: searching full text for degree keywords")
+        raw_entries = _extract_entries_from_section(text)
+        logger.info("Regex entries from full text: %d", len(raw_entries))
+
+    # Fallback 2 : chercher ligne par ligne les mots-clés de diplôme
+    if not raw_entries:
+        logger.info("Fallback 2: line-by-line degree keyword scan")
+        for line in text.split("\n"):
+            line_stripped = line.strip()
+            if not line_stripped:
+                continue
+            if _EXCLUDE_KEYWORDS.search(line_stripped):
+                continue
+            if _DEGREE_KEYWORDS.search(line_stripped):
+                years = _YEAR_PATTERN.findall(line_stripped)
+                raw_entries.append({
+                    "degree": line_stripped,
+                    "school": None,
+                    "years": [int(y) for y in years],
+                    "evidence": line_stripped,
+                })
+        logger.info("Fallback 2 entries: %d", len(raw_entries))
 
     educations: list[Education] = []
     for entry in raw_entries:

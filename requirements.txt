@@ -17,3 +17,6 @@ groq==0.13.0
 
 # ── Upload handling ─────────────────────────────────────────
 python-multipart==0.0.9
+
+# ── Word document generation ─────────────────────────────────
+python-docx>=1.1.2

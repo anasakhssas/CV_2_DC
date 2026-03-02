@@ -24,10 +24,13 @@ PHOTO_OUTPUT_SIZE = (512, 512)
 # ── Niveaux diplômes ────────────────────────────────────────
 DEGREE_LEVELS: dict[str, int] = {
     "doctorat": 8, "phd": 8, "doctorate": 8,
-    "master": 7, "ingénieur": 7, "ingenieur": 7, "msc": 7, "mba": 7,
-    "licence": 6, "bachelor": 6, "bsc": 6,
-    "dut": 5, "bts": 5, "deust": 5, "deug": 5,
+    "master": 7, "mastere": 7, "mastère": 7, "ingénieur": 7, "ingenieur": 7,
+    "cycle ingénieur": 7, "cycle ingenieur": 7, "école d'ingénieur": 7,
+    "msc": 7, "mba": 7, "m2": 7,
+    "licence": 6, "bachelor": 6, "bsc": 6, "ba": 6, "l3": 6,
+    "dut": 5, "bts": 5, "deust": 5, "deug": 5, "bpro": 5,
     "baccalauréat": 4, "baccalaureat": 4, "bac": 4,
+    "classes prépa": 4, "cpge": 4,
 }
 
 # ── Labels de niveau diplôme ────────────────────────────────
@@ -36,7 +39,7 @@ DEGREE_LEVEL_LABELS: dict[int, str] = {
     7: "Bac+5 / Master-Ingénieur",
     6: "Bac+3 / Licence",
     5: "Bac+2 / DUT-BTS",
-    4: "Baccalauréat",
+    4: "Baccalauréat / Prépa",
 }
 
 # ── Mapping langues → niveau /5 ─────────────────────────────
