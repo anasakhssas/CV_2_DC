@@ -20,6 +20,9 @@ from docx.shared import Pt, RGBColor, Cm
 from app.models import DossierCompetences
 from app.services.years_calculator import calculate_years_of_experience
 
+# Logo ACHMITECH — placer le fichier dans app/assets/logo.png
+LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "achmitech_logo.jpg"
+
 logger = logging.getLogger("cv2dc.docx_generator")
 
 # ── Palette couleurs ACHMITECH ───────────────────────────────
@@ -112,8 +115,9 @@ def _run(para, text: str, bold: bool = False, italic: bool = False,
     r.font.color.rgb = color
 
 
-def _stars(level: int, max_l: int = 5) -> str:
-    return "★" * int(level) + "☆" * (max_l - int(level))
+def _level_display(level: int | float, max_l: int = 5) -> str:
+    """Affiche le niveau au format x/5."""
+    return f"{int(level)}/{max_l}"
 
 
 def _years_label(dossier: DossierCompetences) -> str:
@@ -347,7 +351,7 @@ def _add_experience_block(doc: Document, exp) -> None:
 
     # ── Rows 1-6 : full-width merged rows ─────────────────────────
 
-    def _merged_row(row_idx: int, bg: str) -> object:
+    def _merged_row(row_idx: int, bg: str) -> tuple:
         """Merge row's 3 cells into one and apply background."""
         row  = t.rows[row_idx]
         cell = row.cells[0].merge(row.cells[2])
@@ -435,6 +439,44 @@ def _add_experience_block(doc: Document, exp) -> None:
 
 
 # ─────────────────────────────────────────────────────────────
+#  EN-TÊTE (logo + Confidentiel ACHMITECH sur chaque page)
+# ─────────────────────────────────────────────────────────────
+
+def _build_header(section) -> None:
+    """Insère 'Confidentiel ACHMITECH' à gauche et le logo ACHMITECH
+    à droite dans l'en-tête Word — répété sur chaque page."""
+    header = section.header
+    p = header.paragraphs[0]
+    p.paragraph_format.space_after = Pt(2)
+
+    # Tab stop aligné à droite au bord de la zone utile
+    pPr = p._p.get_or_add_pPr()
+    tabs_el = OxmlElement("w:tabs")
+    tab_el  = OxmlElement("w:tab")
+    tab_el.set(qn("w:val"), "right")
+    tab_el.set(qn("w:pos"), str(int(PAGE_W * 567)))
+    tabs_el.append(tab_el)
+    pPr.append(tabs_el)
+
+    # Gauche : texte confidentiel
+    _run(p, "Confidentiel ACHMITECH", italic=True, size=8, color=GREY_RGB)
+
+    # Tabulation vers la droite
+    tab_run = p.add_run()
+    tab_run._r.append(OxmlElement("w:tab"))
+
+    # Droite : logo (ou repli texte)
+    if LOGO_PATH.exists():
+        try:
+            p.add_run().add_picture(str(LOGO_PATH), height=Cm(1.0))
+        except Exception as exc:
+            logger.warning("Logo non inséré dans l'en-tête : %s", exc)
+            _run(p, "ACHMITECH", bold=True, size=11, color=TEAL_RGB)
+    else:
+        _run(p, "ACHMITECH", bold=True, size=11, color=TEAL_RGB)
+
+
+# ─────────────────────────────────────────────────────────────
 #  GÉNÉRATION PRINCIPALE
 # ─────────────────────────────────────────────────────────────
 
@@ -443,38 +485,20 @@ def generate_dossier_docx(dossier: DossierCompetences, output_dir: Path) -> Path
 
     doc = Document()
 
-    # ── Marges ────────────────────────────────────────────────
+    # ── Marges & en-tête ──────────────────────────────────────
     for sec in doc.sections:
-        sec.top_margin    = Cm(1.5)
-        sec.bottom_margin = Cm(1.5)
-        sec.left_margin   = Cm(2.0)
-        sec.right_margin  = Cm(2.0)
+        sec.top_margin      = Cm(2.5)   # espace réservé pour l'en-tête
+        sec.bottom_margin   = Cm(1.5)
+        sec.left_margin     = Cm(2.0)
+        sec.right_margin    = Cm(2.0)
+        sec.header_distance = Cm(1.0)
+        _build_header(sec)
 
     doc.styles["Normal"].font.name = "Calibri"
     doc.styles["Normal"].font.size = Pt(10)
 
     candidate       = dossier.candidate_name or "Candidat"
     extraction_date = (dossier.extraction_date or "")[:10]
-
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    #  LIGNE 1 — Confidentiel ACHMITECH  |  ACHMITECH logo
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    top = doc.add_table(rows=1, cols=2)
-    _no_borders(top)
-    _table_width(top, PAGE_W)
-    _col_width(top.rows[0].cells[0], PAGE_W * 0.6)
-    _col_width(top.rows[0].cells[1], PAGE_W * 0.4)
-
-    p_conf = top.rows[0].cells[0].paragraphs[0]
-    p_conf.paragraph_format.space_after = Pt(2)
-    _run(p_conf, "Confidentiel ACHMITECH", italic=True, size=8, color=GREY_RGB)
-
-    p_logo = top.rows[0].cells[1].paragraphs[0]
-    p_logo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    p_logo.paragraph_format.space_after = Pt(2)
-    _run(p_logo, "ACHMITECH", bold=True, size=11, color=TEAL_RGB)
-
-    doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
     # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     #  LIGNE 2 — Photo candidate  |  Titre
@@ -571,7 +595,7 @@ def generate_dossier_docx(dossier: DossierCompetences, output_dir: Path) -> Path
     #  VOS TOP 5 DES HARD SKILLS
     # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     _top5_table(doc, "VOS TOP 5 DES HARD SKILLS", [
-        (sk.name, _stars(sk.level))
+        (sk.name, _level_display(sk.level))
         for sk in (dossier.hard_skills or [])[:5]
     ])
 
@@ -579,7 +603,7 @@ def generate_dossier_docx(dossier: DossierCompetences, output_dir: Path) -> Path
     #  VOS TOP 5 DES SOFT SKILLS
     # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     _top5_table(doc, "VOS TOP 5 DES SOFT SKILLS", [
-        (sk.name, _stars(sk.level))
+        (sk.name, _level_display(sk.level))
         for sk in (dossier.soft_skills or [])[:5]
     ])
 
@@ -587,7 +611,7 @@ def generate_dossier_docx(dossier: DossierCompetences, output_dir: Path) -> Path
     #  VOS TOP 5 DES OUTILS MAÎTRISÉS
     # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     _top5_table(doc, "VOS TOP 5 DES OUTILS MAÎTRISÉS", [
-        (t.name, _stars(t.level))
+        (t.name, _level_display(t.level))
         for t in (dossier.top_tools or [])[:5]
     ])
 
@@ -602,7 +626,7 @@ def generate_dossier_docx(dossier: DossierCompetences, output_dir: Path) -> Path
             name  = getattr(lang, "name", str(lang))
             level = getattr(lang, "level", None)
             lbl   = getattr(lang, "level_label", None)
-            level_str = lbl or (_stars(int(level)) if level else "")
+            level_str = lbl or (_level_display(int(level)) if level else "")
             lang_rows.append((name, level_str))
 
     _top5_table(doc, "VOS LANGUES MAÎTRISÉES", lang_rows)
@@ -670,7 +694,7 @@ def generate_dossier_docx(dossier: DossierCompetences, output_dir: Path) -> Path
     footer_p = doc.sections[0].footer.paragraphs[0]
     footer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _run(footer_p,
-         f"Cv2DC · Dossier de Compétences généré automatiquement · {extraction_date}",
+         "©COPYRIGHT ACHMITECH : TOUS DROITS RESERVES",
          italic=True, size=8, color=GREY_RGB)
 
     # ── Sauvegarde ────────────────────────────────────────────

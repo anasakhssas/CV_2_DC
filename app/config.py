@@ -45,17 +45,20 @@ DEGREE_LEVEL_LABELS: dict[int, str] = {
 # ── Mapping langues → niveau /5 ─────────────────────────────
 LANGUAGE_LEVEL_MAP: dict[str, float] = {
     # Natif / bilingue
-    "native": 5, "mother tongue": 5, "langue maternelle": 5,
+    "native": 5, "natif": 5, "natif(ve)": 5, "langue maternelle": 5,
+    "mother tongue": 5, "maternelle": 5, "maternel": 5,
     "bilingue": 5, "bilingual": 5, "c2": 5,
-    # Courant
-    "fluent": 4, "couramment": 4, "courant": 4,
+    # Avancé / Courant
+    "avancé": 4, "avance": 4, "advanced": 4,
+    "fluent": 4, "couramment": 4, "courant": 4, "courante": 4,
     "professional proficiency": 4, "c1": 4,
     "full professional proficiency": 4.5,
     # Intermédiaire avancé
     "b2": 3.5, "upper intermediate": 3.5,
-    "intermédiaire avancé": 3.5,
+    "intermédiaire avancé": 3.5, "intermediaire avancé": 3.5,
+    "intermediaire avance": 3.5,
     # Intermédiaire
-    "intermediate": 3, "intermédiaire": 3, "b1": 3,
+    "intermediate": 3, "intermédiaire": 3, "intermediaire": 3, "b1": 3, "moyen": 3,
     # Basique
     "basic": 2, "basique": 2, "notions": 2,
     "scolaire": 2, "a2": 2, "elementary": 2,
@@ -263,6 +266,20 @@ TOOLS_TAXONOMY: set[str] = {
     # Autres
     "wordpress", "unity", "unreal engine",
 }
+
+# ── Normalisation des noms de diplômes ───────────────────────
+# regex pattern → forme normalisée
+DEGREE_NORMALIZATION: list[tuple[str, str]] = [
+    (r"(?i)cycle\s+(?:d[''\u2019]?\s*)?ing[éeè]nieu?r", "Cycle Ingénieur"),
+    (r"(?i)dipl[ôo]me\s+(?:d[''\u2019]?\s*)?ing[éeè]nieu?r", "Diplôme d'Ingénieur"),
+    (r"(?i)\bmaster\s*2\b", "Master 2"),
+    (r"(?i)\bmaster\s*1\b", "Master 1"),
+    (r"(?i)licence\s+professionnelle", "Licence Professionnelle"),
+    (r"(?i)licence\s+fondamentale", "Licence Fondamentale"),
+    (r"(?i)classes?\s+pr[éeè]pa(?:ratoires?)?\s*(?:aux\s+grandes\s+[éeè]coles)?", "Classes Préparatoires (CPGE)"),
+    (r"(?i)\bcpge\b", "Classes Préparatoires (CPGE)"),
+    (r"(?i)baccalaur[éeè]at", "Baccalauréat"),
+]
 
 # ── Normalisation synonymes ──────────────────────────────────
 SKILL_ALIASES: dict[str, str] = {

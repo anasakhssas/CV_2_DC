@@ -22,8 +22,9 @@ from app.services.photo_extractor import extract_photo
 from app.services.education_extractor import extract_educations, determine_last_degree, find_education_section
 from app.services.experience_extractor import extract_experiences
 from app.services.skills_extractor import extract_skills, extract_top_tools
-from app.services.language_extractor import extract_languages
+from app.services.language_extractor import extract_languages, extract_languages_with_levels
 from app.services.name_extractor import extract_candidate_name
+from app.services.years_calculator import calculate_years_of_experience
 from app.services import llm_service
 from app.services.docx_generator import generate_dossier_docx
 
@@ -97,13 +98,87 @@ def _is_valid_education(e: dict) -> bool:
     if not degree:
         return False
 
+    # Degree ressemble à une date ou une localisation (pas un vrai diplôme)
+    if _re.fullmatch(r"[\d\s/\-–—|.,]+", degree):
+        logger.warning("Education rejetée (degree ressemble à une date): %s", degree[:80])
+        return False
+
+    # Degree commence par des chiffres/slashes et contient un pipe → date | location
+    if _re.match(r"^\d[\d\s/\-–—]*\|", degree):
+        logger.warning("Education rejetée (date|location pattern): %s", degree[:80])
+        return False
+
+    # Degree contient un pattern ville/pays (ex: "Rabat, Morocco")
+    if _re.fullmatch(r"[\d\s/|\-–—]*[A-ZÀ-Ÿa-zà-ÿ]+(?:,\s*[A-ZÀ-Ÿa-zà-ÿ]+)*", degree) and len(degree.split()) <= 3:
+        # Vérifier que ce n'est pas un vrai diplôme avec un keyword
+        if not _TECH_KEYWORDS.search(degree) and not _re.search(
+            r'(?i)\b(master|licence|bachelor|baccalaur[éeè]at|bac\b|'
+            r'ing[éeè]nieur|doctorat|phd|dut|bts|dipl[ôo]me|degree|cpge|deust)\b', degree
+        ):
+            logger.warning("Education rejetée (degree ressemble à une localisation): %s", degree[:80])
+            return False
+
     return True
 
 
 def _build_educations(text: str) -> list[EduModel]:
-    """LLM en priorité → regex en fallback."""
-    # 1) Essai LLM
+    """Regex-first + LLM-validator pipeline.
+
+    Architecture inversée (meilleure fiabilité) :
+    1. Regex extrait les candidats (rapide, gratuit, déterministe)
+    2. LLM valide + corrige les résultats regex (pas d'hallucination)
+    3. Si regex vide → LLM en extraction complète (fallback)
+    """
+    # ── Étape 1 : Extraction regex ──────────────────────────
+    regex_educations = extract_educations(text)
+    logger.info("📐 Regex: %d formation(s) trouvées", len(regex_educations))
+
+    # ── Étape 2 : LLM valide les résultats regex ───────────
+    if regex_educations and llm_service.is_available():
+        # Préparer les résultats regex pour le LLM
+        regex_data = [
+            {
+                "year": edu.year,
+                "degree": edu.degree,
+                "school": edu.school,
+                "degree_level": edu.degree_level,
+                "status": edu.status,
+                "evidence": edu.evidence,
+            }
+            for edu in regex_educations
+        ]
+
+        validated = llm_service.validate_educations(regex_data, text)
+        if validated and validated.get("educations"):
+            llm_educations = []
+            for e in validated["educations"]:
+                if not _is_valid_education(e):
+                    continue
+                try:
+                    llm_educations.append(EduModel(
+                        year=e.get("year"),
+                        degree=e.get("degree", ""),
+                        school=e.get("school"),
+                        degree_level=e.get("degree_level"),
+                        status=e.get("status", "obtained"),
+                        evidence=e.get("evidence", "")[:500],
+                        confidence=min(float(e.get("confidence", 0.85)), 1.0),
+                    ))
+                except Exception as llm_e:
+                    logger.warning("Formation validée LLM invalide ignorée: %s | data=%s", llm_e, e)
+            if llm_educations:
+                logger.info("✅ %d formation(s) validées par LLM", len(llm_educations))
+                return llm_educations
+        logger.warning("LLM validation a échoué — utilisation des résultats regex bruts")
+
+    # Si regex a trouvé des résultats mais LLM indisponible → retourner regex
+    if regex_educations:
+        logger.info("📐 Retour des %d formation(s) regex (LLM indisponible)", len(regex_educations))
+        return regex_educations
+
+    # ── Étape 3 : Fallback LLM extraction complète ─────────
     if llm_service.is_available():
+        logger.info("🔄 Fallback: LLM extraction complète (regex n'a rien trouvé)")
         edu_section = find_education_section(text)
         llm_edu = llm_service.enhance_education(text, section_text=edu_section or None)
         if llm_edu and llm_edu.get("educations"):
@@ -119,19 +194,16 @@ def _build_educations(text: str) -> list[EduModel]:
                         degree_level=e.get("degree_level"),
                         status=e.get("status", "obtained"),
                         evidence=e.get("evidence", "")[:500],
-                        confidence=0.9,
+                        confidence=0.85,
                     ))
                 except Exception as llm_e:
-                    logger.warning("Formation LLM invalide ignorée: %s | data=%s", llm_e, e)
+                    logger.warning("Formation LLM fallback invalide ignorée: %s | data=%s", llm_e, e)
             if llm_educations:
-                logger.info("✅ %d formation(s) extraites via LLM", len(llm_educations))
+                logger.info("✅ %d formation(s) extraites via LLM fallback", len(llm_educations))
                 return llm_educations
-        logger.warning("LLM disponible mais n'a pas retourné de formations valides — fallback regex")
 
-    # 2) Fallback regex
-    educations = extract_educations(text)
-    logger.info("Regex: %d formation(s) trouvées", len(educations))
-    return educations
+    logger.warning("⚠️ Aucune formation trouvée (ni regex ni LLM)")
+    return []
 
 
 # ─────────────────────────────────────────────────────────────
@@ -212,16 +284,16 @@ async def extract_full(file: UploadFile = File(...)):
 
         logger.info("✅ Texte extrait: %d caractères, %d images", len(text), len(pdf_content.images))
 
-        # ── 0. Nom du candidat ──────────────────────────────
-        candidate_name, name_confidence = extract_candidate_name(text, pdf_path=str(pdf_path))
-        if not candidate_name:
-            missing_info.append("Nom du candidat non détecté")
-
         # Préparer le dossier de sortie
         cv_output_dir = OUTPUT_DIR / Path(file.filename).stem
         cv_output_dir.mkdir(exist_ok=True)
 
         missing_info: list[str] = []
+
+        # ── 0. Nom du candidat ──────────────────────────────
+        candidate_name, name_confidence = extract_candidate_name(text, pdf_path=str(pdf_path))
+        if not candidate_name:
+            missing_info.append("Nom du candidat non détecté")
 
         # ── 2. Photo ─────────────────────────────────────
         try:
@@ -248,8 +320,20 @@ async def extract_full(file: UploadFile = File(...)):
         if not experiences:
             missing_info.append("Aucune expérience détectée")
 
-        # ── 6. Langues ───────────────────────────────────
+        # ── 6. Années d'expérience ────────────────────
+        years_of_experience = None
+        if experiences:
+            try:
+                years_of_experience = calculate_years_of_experience(experiences)
+                logger.info("✅ Années d'expérience: %.1f ans (dont %.1f hors stages)",
+                            years_of_experience.total_years,
+                            years_of_experience.total_years_excluding_internships)
+            except Exception as e:
+                logger.warning("Erreur calcul années d'expérience: %s", e)
+
+        # ── 7. Langues ───────────────────────────────
         languages = extract_languages(text)
+        languages_with_levels = extract_languages_with_levels(text)
         if not languages:
             missing_info.append("Aucune langue détectée")
 
@@ -337,7 +421,9 @@ async def extract_full(file: UploadFile = File(...)):
             educations=educations,
             last_degree=last_degree,
             experiences=experiences,
+            years_of_experience=years_of_experience,
             languages=languages,
+            languages_with_levels=languages_with_levels,
             hard_skills=hard_skills,
             soft_skills=soft_skills,
             top_tools=top_tools,
@@ -498,7 +584,8 @@ async def extract_languages_only(file: UploadFile = File(...)):
     pdf_content = extract_pdf(pdf_path)
     text = clean_text(pdf_content.text)
     languages = extract_languages(text)
-    return {"languages": languages}
+    languages_with_levels = extract_languages_with_levels(text)
+    return {"languages": languages, "languages_with_levels": languages_with_levels}
 
 
 @app.post("/extract/name")

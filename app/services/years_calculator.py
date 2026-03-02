@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from app.models import Experience, YearsOfExperience
 
 logger = logging.getLogger(__name__)
@@ -30,13 +30,21 @@ _PRESENT_KEYWORDS = re.compile(
 )
 
 
+def _last_day_of_month(year: int, month: int) -> date:
+    """Retourne le dernier jour du mois donné."""
+    if month == 12:
+        return date(year, 12, 31)
+    return date(year, month + 1, 1) - timedelta(days=1)
+
+
 def _parse_date(date_str: str | None, is_end: bool = False) -> date | None:
     """Parse une date texte en objet date.
 
     Règles :
     - "Présent" → date du jour
+    - MM/YYYY ou MM-YYYY → 1er du mois (start) ou dernier jour du mois (end)
     - Année seule → Jan (start) ou Déc (end)
-    - Mois + année → 1er du mois
+    - Mois + année → 1er du mois (start) ou dernier jour du mois (end)
     """
     if not date_str:
         return None
@@ -47,7 +55,16 @@ def _parse_date(date_str: str | None, is_end: bool = False) -> date | None:
     if _PRESENT_KEYWORDS.search(date_str):
         return date.today()
 
-    # Chercher mois + année
+    # Format numérique MM/YYYY ou MM-YYYY
+    numeric_match = re.match(r"^\s*(0?[1-9]|1[0-2])\s*[/\-]\s*((?:19|20)\d{2})\s*$", date_str)
+    if numeric_match:
+        month = int(numeric_match.group(1))
+        year = int(numeric_match.group(2))
+        if is_end:
+            return _last_day_of_month(year, month)
+        return date(year, month, 1)
+
+    # Chercher mois textuel + année
     month_match = None
     for key, month_num in _MONTH_MAP.items():
         if re.search(r"(?i)\b" + re.escape(key) + r"\b", date_str):
@@ -62,10 +79,14 @@ def _parse_date(date_str: str | None, is_end: bool = False) -> date | None:
     year = int(year_match.group())
 
     if month_match:
+        if is_end:
+            return _last_day_of_month(year, month_match)
         return date(year, month_match, 1)
     else:
         # Année seule : conservateur
-        return date(year, 12 if is_end else 1, 1)
+        if is_end:
+            return date(year, 12, 31)
+        return date(year, 1, 1)
 
 
 def _merge_intervals(intervals: list[tuple[date, date]]) -> list[tuple[date, date]]:
@@ -135,12 +156,14 @@ def calculate_years_of_experience(experiences: list[Experience]) -> YearsOfExper
     merged = _merge_intervals(intervals)
     merged_no_intern = _merge_intervals(intervals_no_internship)
 
-    # Calculer durée totale en mois
+    # Calculer durée totale en mois (bornes inclusives : Jan-Dec = 12 mois)
     total_months = 0
     serializable_intervals = []
     for start, end in merged:
-        months = (end.year - start.year) * 12 + (end.month - start.month)
-        total_months += max(months, 0)
+        # +1 car les deux bornes sont inclusives en RH
+        months = (end.year - start.year) * 12 + (end.month - start.month) + 1
+        months = max(months, 1)
+        total_months += months
         serializable_intervals.append({
             "start": start.isoformat(),
             "end": end.isoformat(),
@@ -149,8 +172,9 @@ def calculate_years_of_experience(experiences: list[Experience]) -> YearsOfExper
 
     total_months_no_intern = 0
     for start, end in merged_no_intern:
-        months = (end.year - start.year) * 12 + (end.month - start.month)
-        total_months_no_intern += max(months, 0)
+        months = (end.year - start.year) * 12 + (end.month - start.month) + 1
+        months = max(months, 1)
+        total_months_no_intern += months
 
     total_years = round(total_months / 12, 1) if total_months else 0
     total_years_no_intern = round(total_months_no_intern / 12, 1) if total_months_no_intern else 0

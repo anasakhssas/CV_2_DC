@@ -100,8 +100,6 @@ def extract_skills(text: str) -> tuple[list[Skill], list[Skill]]:
     Returns:
         (hard_skills, soft_skills) triés par score décroissant.
     """
-    text_lower = text.lower()
-
     # ── Détecter tous les skills présents ────────────────
     skill_data: dict[str, dict] = defaultdict(lambda: {
         "name": "",

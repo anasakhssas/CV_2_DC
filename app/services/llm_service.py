@@ -135,8 +135,79 @@ RÈGLES STRICTES:
     return extract_structured(cv_text, instruction, schema)
 
 
+# ─────────────────────────────────────────────────────────────
+#  EDUCATION : LLM VALIDATE (post-processeur des résultats regex)
+# ─────────────────────────────────────────────────────────────
+
+def validate_educations(regex_results: list[dict], cv_text: str) -> dict | None:
+    """Utilise le LLM pour VALIDER et CORRIGER les résultats regex d'éducation.
+
+    Contrairement à enhance_education qui extrait depuis zéro,
+    cette fonction reçoit les résultats regex et demande au LLM de :
+    1. Confirmer que ce sont de vrais diplômes
+    2. Corriger le découpage degree/school si besoin
+    3. Attribuer un score de confiance
+    4. Supprimer les faux positifs
+
+    Returns:
+        Dict avec clé "educations" contenant la liste validée, ou None.
+    """
+    from datetime import date
+    current_year = date.today().year
+
+    client = _get_client()
+    if not client:
+        return None
+
+    # Sérialiser les résultats regex
+    regex_data = json.dumps(regex_results, ensure_ascii=False, indent=2)
+
+    instruction = f"""Tu reçois des diplômes extraits AUTOMATIQUEMENT par regex depuis un CV.
+Année actuelle : {current_year}.
+
+RÉSULTATS REGEX À VALIDER :
+{regex_data}
+
+TEXTE SOURCE DU CV (pour vérification) :
+{cv_text[:3000]}
+
+Pour CHAQUE entrée, tu dois :
+1. VÉRIFIER que c'est un vrai diplôme académique (pas une certification, MOOC, workshop, compétence technique)
+2. CORRIGER le champ "degree" si il contient du bruit (années, tirets, noms d'école mélangés).
+   Le degree doit faire MAX 10 mots et contenir UNIQUEMENT le nom du diplôme.
+3. CORRIGER le champ "school" si besoin (séparer du degree, ou identifier l'établissement dans le texte source)
+4. VÉRIFIER l'année (year) — prendre l'année de FIN du diplôme
+5. Attribuer degree_level : "Bac" | "Bac+2" | "Bac+3" | "Bac+5" | "Bac+8" | null
+6. Attribuer status : "en_cours" si year >= {current_year} ou texte indique en cours, sinon "obtained"
+7. Attribuer confidence : 0.0 à 1.0
+
+RÈGLES :
+- Si une entrée N'EST PAS un diplôme → NE PAS l'inclure dans la réponse
+- NE PAS inventer de diplômes qui ne sont pas dans les résultats regex
+- Si un résultat regex est correct → le garder tel quel avec confidence élevée
+- Si un résultat est partiellement correct → le corriger
+- INTERDIT d'ajouter des diplômes qui n'étaient pas dans les résultats regex
+
+Retourne la liste validée/corrigée."""
+
+    schema = {
+        "educations": [
+            {
+                "year": "int|null",
+                "degree": "string (max 10 mots, nom du diplôme uniquement)",
+                "school": "string|null (nom de l'établissement uniquement)",
+                "degree_level": "string|null",
+                "status": "string (obtained|en_cours)",
+                "confidence": "float 0-1",
+                "evidence": "string (citation courte du CV)",
+            }
+        ]
+    }
+    return extract_structured(cv_text[:4000], instruction, schema, temperature=0.01)
+
+
 def enhance_education(cv_text: str, section_text: str | None = None) -> dict | None:
-    """Utilise le LLM pour extraire les formations."""
+    """Utilise le LLM pour extraire les formations (fallback quand regex échoue)."""
     from datetime import date
     current_year = date.today().year
 

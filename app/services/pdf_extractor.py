@@ -21,10 +21,119 @@ class PDFContent:
     is_scanned: bool = False
 
 
+# ── Multi-column layout detection & reassembly ───────────────
+
+
+def _detect_column_boundary(blocks: list, page_width: float) -> float | None:
+    """Return the x-position boundary between two columns, or *None* if single-column.
+
+    Strategy:
+    1. Collect left-edge (x0) positions of all text blocks, sort them.
+    2. Look for the widest gap inside the middle 60 % of the page.
+    3. Validate that both sides contain genuine column content, not just
+       short section headings.  We require:
+       - at least ``_MIN_BLOCKS_PER_COLUMN`` blocks per side, **and**
+       - at least ``_MIN_CHARS_PER_COLUMN`` total characters per side.
+       This prevents centered headers or short left-aligned headings
+       from tricking the detector on single-column CVs.
+    """
+    _MIN_BLOCKS_PER_COLUMN = 5
+    _MIN_CHARS_PER_COLUMN = 200  # a real column has paragraphs, not just headings
+
+    text_blocks = [b for b in blocks if b[6] == 0 and b[4].strip()]
+    if len(text_blocks) < _MIN_BLOCKS_PER_COLUMN * 2:
+        return None
+
+    x_starts = sorted({round(b[0]) for b in text_blocks})
+    left_bound = page_width * 0.20
+    right_bound = page_width * 0.80
+
+    best_gap = 0.0
+    best_boundary: float | None = None
+
+    for i in range(len(x_starts) - 1):
+        gap = x_starts[i + 1] - x_starts[i]
+        mid = (x_starts[i] + x_starts[i + 1]) / 2.0
+        if gap > best_gap and left_bound < mid < right_bound:
+            best_gap = gap
+            best_boundary = mid
+
+    if best_gap <= page_width * 0.10 or best_boundary is None:
+        return None
+
+    # Classify blocks into left / right by their horizontal center
+    left_blocks = [b for b in text_blocks if (b[0] + b[2]) / 2.0 < best_boundary]
+    right_blocks = [b for b in text_blocks if (b[0] + b[2]) / 2.0 >= best_boundary]
+
+    left_count = len(left_blocks)
+    right_count = len(right_blocks)
+    left_chars = sum(len(b[4].strip()) for b in left_blocks)
+    right_chars = sum(len(b[4].strip()) for b in right_blocks)
+
+    if (
+        left_count < _MIN_BLOCKS_PER_COLUMN
+        or right_count < _MIN_BLOCKS_PER_COLUMN
+        or left_chars < _MIN_CHARS_PER_COLUMN
+        or right_chars < _MIN_CHARS_PER_COLUMN
+    ):
+        logger.debug(
+            "Gap found (%.0f) but content insufficient: "
+            "left=%d blocks/%d chars, right=%d blocks/%d chars",
+            best_gap, left_count, left_chars, right_count, right_chars,
+        )
+        return None
+
+    return best_boundary
+
+
+def _reassemble_columns(blocks: list, boundary: float) -> str:
+    """Re-order text blocks so that *left column* comes first (sorted by y),
+    then *right column* (sorted by y).  This avoids the interleaving that
+    ``page.get_text("text")`` produces on multi-column CVs.
+    """
+    text_blocks = [b for b in blocks if b[6] == 0 and b[4].strip()]
+
+    left = sorted(
+        [b for b in text_blocks if (b[0] + b[2]) / 2.0 < boundary],
+        key=lambda b: b[1],
+    )
+    right = sorted(
+        [b for b in text_blocks if (b[0] + b[2]) / 2.0 >= boundary],
+        key=lambda b: b[1],
+    )
+
+    parts: list[str] = []
+    for b in left + right:
+        parts.append(b[4].rstrip("\n"))
+    return "\n".join(parts)
+
+
+def _extract_page_text(page) -> str:
+    """Extract text from a single page, handling multi-column layouts."""
+    blocks = page.get_text("blocks")
+    page_width = page.rect.width
+
+    boundary = _detect_column_boundary(blocks, page_width)
+    if boundary is not None:
+        logger.info(
+            "Multi-column layout detected (boundary=%.0f / page_width=%.0f)",
+            boundary, page_width,
+        )
+        return _reassemble_columns(blocks, boundary)
+
+    # Single-column: default extraction
+    return page.get_text("text") or ""
+
+
+# ── Main extraction ──────────────────────────────────────────
+
+
 def extract_pdf(pdf_path: str | Path) -> PDFContent:
     """Extrait texte + images d'un fichier PDF.
 
     Détecte automatiquement si le PDF est numérique ou scanné.
+    Gère les mises en page multi-colonnes en réassemblant le texte
+    colonne par colonne (gauche puis droite).
     """
     pdf_path = Path(pdf_path)
     if not pdf_path.exists():
@@ -38,8 +147,8 @@ def extract_pdf(pdf_path: str | Path) -> PDFContent:
     for page_num in range(len(doc)):
         page = doc[page_num]
 
-        # ── Texte ────────────────────────────────────────
-        page_text = page.get_text("text") or ""
+        # ── Texte (with multi-column awareness) ──────────
+        page_text = _extract_page_text(page)
         content.pages_text.append(page_text)
         all_text_parts.append(page_text)
 
